@@ -1,0 +1,302 @@
+import { motion } from 'framer-motion';
+import { MarkdownRenderer } from './MarkdownRenderer';
+import { ErrorCard } from './ErrorCard';
+import { CopyButton } from './CopyButton';
+import { SpeakButton } from './SpeakButton';
+import { ImageThumbnails } from './ImageThumbnails';
+import { ThinkingBlock } from './ThinkingBlock';
+import { SandboxSetupCard } from './SandboxSetupCard';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { formatQuotedText } from '../utils/formatQuote';
+import { quote } from '../config';
+import { COMMANDS, SCREEN_CAPTURE_PLACEHOLDER } from '../config/commands';
+import type { OllamaErrorKind } from '../hooks/useOllama';
+import type { SearchResultPreview, SearchWarning } from '../types/search';
+import { SEARCH_WARNING_COPY, SEARCH_WARNING_SEVERITY } from '../config/searchWarnings';
+
+/**
+ * Renders user message content with slash commands styled distinctly.
+ * Only the FIRST occurrence of each command trigger is styled; duplicate
+ * triggers render as plain text (the first one is the active command).
+ */
+function renderUserContent(content: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let remaining = content;
+  const styledCommands = new Set<string>();
+
+  while (remaining.length > 0) {
+    // Find the earliest command trigger in remaining text (skip already-styled ones)
+    let earliest = -1;
+    let matchedTrigger = '';
+    for (const cmd of COMMANDS) {
+      if (styledCommands.has(cmd.trigger)) continue;
+      const idx = remaining.indexOf(cmd.trigger);
+      if (idx !== -1 && (earliest === -1 || idx < earliest)) {
+        const before = idx === 0 || remaining[idx - 1] === ' ';
+        const after =
+          idx + cmd.trigger.length >= remaining.length ||
+          remaining[idx + cmd.trigger.length] === ' ';
+        if (before && after) {
+          earliest = idx;
+          matchedTrigger = cmd.trigger;
+        }
+      }
+    }
+
+    if (earliest === -1) {
+      parts.push(<span key={parts.length}>{remaining}</span>);
+      break;
+    }
+
+    // Text before the command
+    if (earliest > 0) {
+      parts.push(
+        <span key={parts.length}>{remaining.slice(0, earliest)}</span>,
+      );
+    }
+    // The command itself, styled (first occurrence only)
+    parts.push(
+      <span key={parts.length} className="font-semibold text-[#7C2D12]">
+        {matchedTrigger}
+      </span>,
+    );
+    styledCommands.add(matchedTrigger);
+    remaining = remaining.slice(earliest + matchedTrigger.length);
+  }
+
+  return <>{parts}</>;
+}
+
+interface ChatBubbleProps {
+  /** The message role determines alignment and color treatment. */
+  role: 'user' | 'assistant';
+  /** The message content to render. AI messages support markdown. */
+  content: string;
+  /** Stagger index for orchestrated entrance choreography. */
+  index: number;
+  /** Unique identifier of the message, used for TTS tracking. */
+  messageId: string;
+  /** Selected text from the host app that was quoted alongside this message, if any. */
+  quotedText?: string;
+  /** Whether this bubble is actively streaming content from the LLM. */
+  isStreaming?: boolean;
+  /** When set, renders an ErrorCard callout instead of markdown. */
+  errorKind?: OllamaErrorKind;
+  /** Accumulated thinking/reasoning content from the model, if thinking mode was used. */
+  thinkingContent?: string;
+  /** Whether the model is currently in the thinking phase (streaming thinking tokens). */
+  isThinking?: boolean;
+  /** Absolute file paths of images attached to this message, if any. */
+  imagePaths?: string[];
+  /** Called when the user clicks a thumbnail to preview it. */
+  onImagePreview?: (path: string) => void;
+  /** Whether this message is currently being spoken by TTS. */
+  isSpeaking?: boolean;
+  /** Called when the user clicks the speak button to start speaking. */
+  onSpeak?: (messageId: string, content: string) => void;
+  /** Called when the user clicks stop on a playing message. */
+  onStopSpeaking?: () => void;
+  /** Whether the TTS privacy disclosure has been acknowledged. */
+  privacyAcknowledged?: boolean;
+  /** Called when the user acknowledges the TTS privacy disclosure. */
+  onAcknowledgePrivacy?: () => void;
+  /** Search result sources from /search pipeline. */
+  searchSources?: SearchResultPreview[];
+  /** Search warnings from /search pipeline. */
+  searchWarnings?: SearchWarning[];
+  /** Whether the search sandbox was unreachable. */
+  sandboxUnavailable?: boolean;
+}
+
+/**
+ * Framer Motion variants for individual chat bubbles.
+ * Uses GPU-accelerated transforms (opacity, y, scale) for jank-free animation.
+ * Spring physics provide natural, organic motion.
+ */
+const bubbleVariants = {
+  hidden: { opacity: 0, y: 12, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: 'spring' as const,
+      stiffness: 380,
+      damping: 26,
+    },
+  },
+};
+
+/**
+ * Renders a chat message following industry-standard assistant UI conventions:
+ *
+ * - **User messages** — right-aligned bubble with warm gradient, quoted-text
+ *   support, and an always-visible copy button below the bubble (right-aligned).
+ * - **AI messages** — full-width plain text (no bubble), markdown-rendered, with
+ *   an always-visible copy button below the text (left-aligned).
+ *
+ * Spring entrance animation is staggered by `index` to produce natural
+ * choreography when multiple messages appear at once.
+ */
+export function ChatBubble({
+  role,
+  content,
+  index,
+  messageId,
+  quotedText,
+  isStreaming = false,
+  imagePaths,
+  onImagePreview,
+  errorKind,
+  thinkingContent,
+  isThinking,
+  isSpeaking = false,
+  onSpeak,
+  onStopSpeaking,
+  privacyAcknowledged = false,
+  onAcknowledgePrivacy,
+  searchSources,
+  searchWarnings,
+  sandboxUnavailable,
+}: ChatBubbleProps) {
+  const isUser = role === 'user';
+
+  return (
+    <motion.div
+      variants={bubbleVariants}
+      initial="hidden"
+      animate="visible"
+      transition={{ delay: index * 0.06 }}
+      className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}
+    >
+      {isUser ? (
+        /* User bubble — max-width capped, stacks bubble + action bar */
+        <div className="flex flex-col max-w-[80%]">
+          <div className="chat-bubble chat-bubble-user relative px-4 py-2.5 text-sm leading-relaxed select-text rounded-lg rounded-br-sm">
+            {quotedText && (
+              <p className="border-l-2 border-white/40 pl-2 mb-2 italic text-xs text-white/60 whitespace-pre-wrap">
+                {formatQuotedText(
+                  quotedText,
+                  quote.maxDisplayLines,
+                  quote.maxDisplayChars,
+                )}
+              </p>
+            )}
+            {imagePaths && imagePaths.length > 0 && onImagePreview && (
+              <div className="mb-2">
+                <ImageThumbnails
+                  items={imagePaths.map((p) => ({
+                    id: p,
+                    src:
+                      p === SCREEN_CAPTURE_PLACEHOLDER
+                        ? p
+                        : p.startsWith('blob:')
+                          ? p
+                          : convertFileSrc(p),
+                    loading: p.startsWith('blob:'),
+                    placeholder: p === SCREEN_CAPTURE_PLACEHOLDER,
+                  }))}
+                  onPreview={onImagePreview}
+                  size={48}
+                />
+              </div>
+            )}
+            {content && (
+              <span className="text-white/95 font-medium whitespace-pre-wrap">
+                {renderUserContent(content)}
+              </span>
+            )}
+          </div>
+          {content && (
+            <div className="h-6 flex items-center px-1">
+              <CopyButton content={content} align="right" />
+              {onSpeak && onStopSpeaking && onAcknowledgePrivacy && (
+                <SpeakButton
+                  content={content}
+                  messageId={messageId}
+                  align="right"
+                  isSpeaking={isSpeaking}
+                  onSpeak={onSpeak}
+                  onStop={onStopSpeaking}
+                  privacyAcknowledged={privacyAcknowledged}
+                  onAcknowledgePrivacy={onAcknowledgePrivacy}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* AI plain text — full width, no bubble chrome */
+        <div className="flex flex-col w-full">
+          {sandboxUnavailable && <SandboxSetupCard />}
+          {searchWarnings && searchWarnings.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {searchWarnings.map((w) => {
+                const severity = SEARCH_WARNING_SEVERITY[w];
+                const label = SEARCH_WARNING_COPY[w];
+                return (
+                  <span
+                    key={w}
+                    className={`text-[10px] px-1.5 py-0.5 rounded ${
+                      severity === 'error'
+                        ? 'bg-red-900/30 text-red-400'
+                        : 'bg-amber-900/30 text-amber-400'
+                    }`}
+                  >
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          <div className="text-sm leading-relaxed select-text py-1">
+            {thinkingContent && (
+              <ThinkingBlock
+                thinkingContent={thinkingContent}
+                isThinking={isThinking ?? false}
+              />
+            )}
+            {errorKind ? (
+              <ErrorCard kind={errorKind} message={content} />
+            ) : (
+              <MarkdownRenderer content={content} isStreaming={isStreaming} />
+            )}
+          </div>
+          {searchSources && searchSources.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {searchSources.map((s) => (
+                <a
+                  key={s.url}
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-blue-400 hover:bg-white/10 truncate max-w-[200px]"
+                  title={s.url}
+                >
+                  {s.title}
+                </a>
+              ))}
+            </div>
+          )}
+          {!errorKind && !isStreaming && (
+            <div className="h-6 flex items-center">
+              <CopyButton content={content} align="left" />
+              {onSpeak && onStopSpeaking && onAcknowledgePrivacy && (
+                <SpeakButton
+                  content={content}
+                  messageId={messageId}
+                  align="left"
+                  isSpeaking={isSpeaking}
+                  onSpeak={onSpeak}
+                  onStop={onStopSpeaking}
+                  privacyAcknowledged={privacyAcknowledged}
+                  onAcknowledgePrivacy={onAcknowledgePrivacy}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </motion.div>
+  );
+}
