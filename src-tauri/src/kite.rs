@@ -36,6 +36,8 @@ const KITE_AUTH_STATE_KEY: &str = "kite_auth_state";
 const KITE_LAST_PAYER_KEY: &str = "kite_last_payer_addr";
 const KITE_SIGNUP_EMAIL_KEY: &str = "kite_signup_email";
 const KITE_PENDING_SIGNUP_ID_KEY: &str = "kite_pending_signup_id";
+const KITE_PENDING_LOGIN_ID_KEY: &str = "kite_pending_login_id";
+const KITE_ACTIVE_SPENDING_SESSION_KEY: &str = "kite_active_spending_session_id";
 
 const KITE_CLI_BASE_URL: &str = "https://cli.gokite.ai";
 const KITE_DOCS_URL: &str = "https://docs.gokite.ai/kite-agent-passport/developer-guide";
@@ -43,6 +45,7 @@ const KITE_PORTAL_URL: &str = "https://x402-portal-eight.vercel.app/";
 const KITE_INSTALLER_URL: &str = "https://cli.gokite.ai/install.sh";
 const KITE_TESTNET_MCP_URL: &str = "https://neo.dev.gokite.ai/v1/mcp";
 const MCP_PROTOCOL_VERSION: &str = "2025-03-26";
+const KITE_AGENT_TYPE: &str = "codex";
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -137,6 +140,178 @@ pub struct KiteAgentCapability {
     pub reason: String,
 }
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteAccountSummary {
+    pub logged_in: bool,
+    pub email: Option<String>,
+    pub user_id: Option<String>,
+    pub signup_email: Option<String>,
+    pub pending_signup_id: Option<String>,
+    pub pending_login_id: Option<String>,
+    pub current_agent_identity: Option<String>,
+    pub auth_state: KiteAuthState,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteWalletAsset {
+    pub symbol: String,
+    pub balance: String,
+    pub native: bool,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteWalletSummary {
+    pub wallet_address: String,
+    pub wallet_type: String,
+    pub chain_id: i64,
+    pub assets: Vec<KiteWalletAsset>,
+    pub can_use_faucet: bool,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteWalletTransfer {
+    pub wallet_address: String,
+    pub recipient_address: String,
+    pub asset: String,
+    pub amount: String,
+    pub transaction_hash: String,
+    pub chain_id: i64,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteSessionSummary {
+    pub id: String,
+    pub status: String,
+    pub agent_type: String,
+    pub expires_at: Option<String>,
+    pub task_summary: Option<String>,
+    pub assets: Vec<String>,
+    pub max_amount_per_tx: Option<String>,
+    pub max_total_amount: Option<String>,
+    pub spent_total: Option<String>,
+    pub reserved_total: Option<String>,
+    pub selected: bool,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteSessionRequestStatus {
+    pub request_id: String,
+    pub status: String,
+    pub session_id: Option<String>,
+    pub approval_url: Option<String>,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteActivityEvent {
+    pub id: String,
+    pub kind: String,
+    pub status: String,
+    pub title: String,
+    pub occurred_at: String,
+    pub amount_display: Option<String>,
+    pub chain_name: Option<String>,
+    pub tx_hash: Option<String>,
+    pub order_id: Option<String>,
+    pub item_titles: Vec<String>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteShopItem {
+    pub provider: String,
+    pub external_identifier: String,
+    pub title: String,
+    pub price: String,
+    pub rating: Option<String>,
+    pub reviews: Option<String>,
+    pub link: Option<String>,
+    pub thumbnail: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteCartItem {
+    pub provider: String,
+    pub external_identifier: String,
+    pub product_locator: String,
+    pub title: String,
+    pub price: String,
+    pub quantity: i64,
+    pub link: Option<String>,
+    pub thumbnail: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteShippingSummary {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub line1: Option<String>,
+    pub line2: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
+    pub postal_code: Option<String>,
+    pub country: Option<String>,
+    pub complete: bool,
+    pub missing: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteCartSummary {
+    pub items: Vec<KiteCartItem>,
+    pub item_count: usize,
+    pub payment_currency: Option<String>,
+    pub payment_chain: Option<String>,
+    pub shipping: Option<KiteShippingSummary>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteOrderSummary {
+    pub order_id: String,
+    pub phase: Option<String>,
+    pub payment_status: Option<String>,
+    pub tx_hash: Option<String>,
+    pub currency: Option<String>,
+    pub chain: Option<String>,
+    pub delivery_status: Option<String>,
+    pub title: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteDeveloperSummary {
+    pub auth_state: KiteAuthState,
+    pub connected: bool,
+    pub masked_mcp_url: Option<String>,
+    pub last_payer_addr: Option<String>,
+    pub current_session_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KiteHubState {
+    pub setup: KiteSetupStatus,
+    pub account: KiteAccountSummary,
+    pub wallet: Option<KiteWalletSummary>,
+    pub sessions: Vec<KiteSessionSummary>,
+    pub activity: Vec<KiteActivityEvent>,
+    pub cart: Option<KiteCartSummary>,
+    pub orders: Vec<KiteOrderSummary>,
+    pub developer: KiteDeveloperSummary,
+    pub issues: Vec<String>,
+}
+
 pub struct KiteRuntimeState {
     pending_payment_id: Mutex<Option<String>>,
     pending_payment_tx: Mutex<Option<oneshot::Sender<bool>>>,
@@ -180,8 +355,52 @@ enum KiteCommand {
         email: Option<String>,
         code: Option<String>,
     },
+    Login {
+        email: Option<String>,
+        code: Option<String>,
+    },
+    Logout,
+    Me,
     Connect,
     Status,
+    Wallet,
+    Send {
+        to: String,
+        amount: String,
+        asset: String,
+    },
+    Faucet {
+        token: String,
+    },
+    Sessions,
+    SessionCreate {
+        max_amount_per_tx: String,
+        ttl: String,
+        max_total_amount: Option<String>,
+        assets: Option<String>,
+        payment_approach: Option<String>,
+        task_summary: Option<String>,
+    },
+    SessionUse {
+        session_id: String,
+    },
+    SessionStatus {
+        request_id: String,
+        wait: bool,
+    },
+    Activity {
+        kind: Option<String>,
+    },
+    ShopSearch {
+        query: String,
+    },
+    Cart,
+    Checkout {
+        confirmed: bool,
+    },
+    Orders {
+        order_id: Option<String>,
+    },
     Payer,
     Approve {
         payee_addr: String,
@@ -370,6 +589,35 @@ struct KpassSignupExchangeResponse {
     status: String,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+struct KpassLoginInitResponse {
+    login_id: String,
+    status: String,
+    #[serde(default)]
+    hint: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+struct KpassWalletBalanceResponse {
+    wallet_address: String,
+    wallet_type: String,
+    chain_id: i64,
+    #[serde(default)]
+    assets: Vec<KiteWalletAsset>,
+    status: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+struct KpassWalletTransferResponse {
+    wallet_address: String,
+    recipient_address: String,
+    asset: String,
+    amount: String,
+    transaction_hash: String,
+    chain_id: i64,
+    status: String,
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 #[cfg_attr(not(coverage), tauri::command)]
 pub fn get_kite_setup_status(
@@ -401,6 +649,88 @@ pub fn disconnect_kite(db: State<'_, crate::history::Database>) -> Result<(), St
         db.0.lock()
             .map_err(|e: std::sync::PoisonError<_>| e.to_string())?;
     clear_kite_settings(&conn).map_err(|e| e.to_string())
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg_attr(not(coverage), tauri::command)]
+pub fn get_kite_hub_state(
+    db: State<'_, crate::history::Database>,
+) -> Result<KiteHubState, String> {
+    get_kite_hub_state_inner(db.inner()).map_err(|e| e.message().to_string())
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg_attr(not(coverage), tauri::command)]
+pub fn kite_logout(db: State<'_, crate::history::Database>) -> Result<KiteAccountSummary, String> {
+    let cli_path = detect_kite_cli().ok_or_else(|| KiteError::CliMissing.message().to_string())?;
+    kite_logout_inner(db.inner(), &cli_path).map_err(|e| e.message().to_string())
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg_attr(not(coverage), tauri::command)]
+pub fn kite_wallet_send(
+    to: String,
+    amount: String,
+    asset: String,
+    _db: State<'_, crate::history::Database>,
+) -> Result<KiteWalletTransfer, String> {
+    let cli_path = detect_kite_cli().ok_or_else(|| KiteError::CliMissing.message().to_string())?;
+    kite_wallet_send_inner(&cli_path, &to, &amount, &asset)
+        .map_err(|e| e.message().to_string())
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg_attr(not(coverage), tauri::command)]
+pub fn kite_faucet_drop(
+    token: String,
+    _db: State<'_, crate::history::Database>,
+) -> Result<KiteWalletTransfer, String> {
+    let cli_path = detect_kite_cli().ok_or_else(|| KiteError::CliMissing.message().to_string())?;
+    kite_faucet_drop_inner(&cli_path, &token).map_err(|e| e.message().to_string())
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg_attr(not(coverage), tauri::command)]
+pub fn kite_use_session(
+    session_id: String,
+    db: State<'_, crate::history::Database>,
+) -> Result<KiteSessionSummary, String> {
+    let cli_path = detect_kite_cli().ok_or_else(|| KiteError::CliMissing.message().to_string())?;
+    kite_use_session_inner(db.inner(), &cli_path, &session_id).map_err(|e| e.message().to_string())
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg_attr(not(coverage), tauri::command)]
+pub fn kite_shop_search(
+    query: String,
+) -> Result<Vec<KiteShopItem>, String> {
+    let cli_path = detect_kite_cli().ok_or_else(|| KiteError::CliMissing.message().to_string())?;
+    kite_shop_search_inner(&cli_path, &query).map_err(|e| e.message().to_string())
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg_attr(not(coverage), tauri::command)]
+pub fn kite_cart_add(
+    provider: String,
+    external_id: String,
+    quantity: Option<i64>,
+    _db: State<'_, crate::history::Database>,
+) -> Result<KiteCartSummary, String> {
+    let cli_path = detect_kite_cli().ok_or_else(|| KiteError::CliMissing.message().to_string())?;
+    kite_cart_add_inner(&cli_path, &provider, &external_id, quantity.unwrap_or(1))
+        .map_err(|e| e.message().to_string())
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg_attr(not(coverage), tauri::command)]
+pub fn kite_cart_remove(
+    provider: String,
+    external_id: String,
+    _db: State<'_, crate::history::Database>,
+) -> Result<KiteCartSummary, String> {
+    let cli_path = detect_kite_cli().ok_or_else(|| KiteError::CliMissing.message().to_string())?;
+    kite_cart_remove_inner(&cli_path, &provider, &external_id)
+        .map_err(|e| e.message().to_string())
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -605,6 +935,34 @@ async fn run_kite_command_inner(
             }
             Ok(())
         }
+        KiteCommand::Login { email, code } => {
+            let show_summary = code.is_some();
+            let account = handle_kite_login(
+                db,
+                KiteSetupRequest { email, code },
+                emit,
+            )?;
+            if show_summary {
+                emit(KiteEvent::Token(format_account_summary(&account)));
+            }
+            Ok(())
+        }
+        KiteCommand::Logout => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let account = kite_logout_inner(db, &cli_path)?;
+            emit(KiteEvent::Token(format_account_summary(&account)));
+            Ok(())
+        }
+        KiteCommand::Me => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let conn =
+                db.0.lock()
+                    .map_err(|e: std::sync::PoisonError<_>| KiteError::Unknown(e.to_string()))?;
+            let account = load_kite_account_summary(&conn, Some(&cli_path));
+            drop(conn);
+            emit(KiteEvent::Token(format_account_summary(&account)));
+            Ok(())
+        }
         KiteCommand::Connect | KiteCommand::Status => {
             emit(KiteEvent::VerifyingConnection);
             match verify_kite_connection_inner(client, db).await {
@@ -647,6 +1005,125 @@ async fn run_kite_command_inner(
                     }
                 }
             }
+        }
+        KiteCommand::Wallet => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let wallet = load_kite_wallet_summary(&cli_path)?;
+            emit(KiteEvent::Token(format_wallet_summary(&wallet)));
+            Ok(())
+        }
+        KiteCommand::Send { to, amount, asset } => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let transfer = kite_wallet_send_inner(&cli_path, &to, &amount, &asset)?;
+            emit(KiteEvent::Token(format_wallet_transfer(&transfer, "Transfer complete")));
+            Ok(())
+        }
+        KiteCommand::Faucet { token } => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let transfer = kite_faucet_drop_inner(&cli_path, &token)?;
+            emit(KiteEvent::Token(format_wallet_transfer(&transfer, "Faucet drop complete")));
+            Ok(())
+        }
+        KiteCommand::Sessions => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let conn =
+                db.0.lock()
+                    .map_err(|e: std::sync::PoisonError<_>| KiteError::Unknown(e.to_string()))?;
+            let selected = load_optional_setting(&conn, KITE_ACTIVE_SPENDING_SESSION_KEY);
+            drop(conn);
+            let sessions = load_kite_sessions(&cli_path, selected.as_deref())?;
+            emit(KiteEvent::Token(format_sessions_summary(&sessions)));
+            Ok(())
+        }
+        KiteCommand::SessionCreate {
+            max_amount_per_tx,
+            ttl,
+            max_total_amount,
+            assets,
+            payment_approach,
+            task_summary,
+        } => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let status = create_kite_session(
+                &cli_path,
+                &max_amount_per_tx,
+                &ttl,
+                max_total_amount.as_deref(),
+                assets.as_deref(),
+                payment_approach.as_deref(),
+                task_summary.as_deref(),
+            )?;
+            emit(KiteEvent::Token(format_session_request_status(&status)));
+            Ok(())
+        }
+        KiteCommand::SessionUse { session_id } => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let session = kite_use_session_inner(db, &cli_path, &session_id)?;
+            emit(KiteEvent::Token(format_sessions_summary(&[session])));
+            Ok(())
+        }
+        KiteCommand::SessionStatus { request_id, wait } => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let status = load_kite_session_request_status(&cli_path, &request_id, wait)?;
+            if let Some(session_id) = status.session_id.as_deref() {
+                let _ = store_string_setting(db, KITE_ACTIVE_SPENDING_SESSION_KEY, session_id);
+            }
+            emit(KiteEvent::Token(format_session_request_status(&status)));
+            Ok(())
+        }
+        KiteCommand::Activity { kind } => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let events = load_kite_activity_events(&cli_path, kind.as_deref(), 10)?;
+            emit(KiteEvent::Token(format_activity_summary(&events)));
+            Ok(())
+        }
+        KiteCommand::ShopSearch { query } => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let items = kite_shop_search_inner(&cli_path, &query)?;
+            emit(KiteEvent::Token(format_shop_search_results(&query, &items)));
+            Ok(())
+        }
+        KiteCommand::Cart => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            let cart = load_kite_cart_summary(&cli_path)?;
+            emit(KiteEvent::Token(format_cart_summary(&cart)));
+            Ok(())
+        }
+        KiteCommand::Checkout { confirmed } => {
+            if !confirmed {
+                emit(KiteEvent::Token(
+                    "Kite checkout pauses for explicit confirmation.\n\nUse `/kite checkout --confirmed yes` only after you have reviewed the cart, shipping profile, and active spending session.".to_string(),
+                ));
+                return Ok(());
+            }
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            run_kpass_json_value(
+                &cli_path,
+                &[
+                    "shop:checkout",
+                    "--confirmed",
+                    "--output",
+                    "json",
+                    "--no-interactive",
+                ],
+                &[],
+                "shopping checkout",
+            )?;
+            let events = load_kite_activity_events(&cli_path, Some("shopping_checkout"), 1)?;
+            emit(KiteEvent::Token(format_activity_summary(&events)));
+            Ok(())
+        }
+        KiteCommand::Orders { order_id } => {
+            let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+            if let Some(order_id) = order_id {
+                let order = load_kite_order_status(&cli_path, &order_id)?;
+                emit(KiteEvent::Token(format_orders_summary(&[order])));
+            } else {
+                let events = load_kite_activity_events(&cli_path, Some("shopping_checkout"), 10)?;
+                let orders = derive_order_summaries(&events);
+                emit(KiteEvent::Token(format_orders_summary(&orders)));
+            }
+            Ok(())
         }
         KiteCommand::Payer => {
             emit(KiteEvent::FetchingPayer);
@@ -939,6 +1416,291 @@ async fn handle_kite_setup(
         KITE_TESTNET_MCP_URL
     )));
     Ok(status)
+}
+
+fn handle_kite_login(
+    db: &crate::history::Database,
+    request: KiteSetupRequest,
+    emit: &mut impl FnMut(KiteEvent),
+) -> Result<KiteAccountSummary, KiteError> {
+    let cli_path = detect_kite_cli().ok_or(KiteError::CliMissing)?;
+    let conn =
+        db.0.lock()
+            .map_err(|e: std::sync::PoisonError<_>| KiteError::Unknown(e.to_string()))?;
+    let saved_email = load_optional_setting(&conn, KITE_SIGNUP_EMAIL_KEY);
+    let saved_login_id = load_optional_setting(&conn, KITE_PENDING_LOGIN_ID_KEY);
+    drop(conn);
+
+    let resolved_email = match request.email {
+        Some(email) => Some(validate_signup_email(&email)?),
+        None => saved_email.clone(),
+    };
+    let resolved_code = request
+        .code
+        .as_deref()
+        .map(validate_signup_code)
+        .transpose()?;
+
+    if let Some(code) = resolved_code.as_deref() {
+        let login_id = saved_login_id.ok_or_else(|| {
+            KiteError::BadInput(
+                "No pending Kite login was found. Start with `/kite login --email you@example.com` first.".to_string(),
+            )
+        })?;
+        let user = complete_kite_login(&cli_path, &login_id, code)?;
+        store_string_setting(db, KITE_SIGNUP_EMAIL_KEY, &user.email)?;
+        store_string_setting(db, KITE_PENDING_LOGIN_ID_KEY, "")?;
+    } else if let Some(email) = resolved_email.as_deref() {
+        let login = start_kite_login(&cli_path, email)?;
+        store_string_setting(db, KITE_SIGNUP_EMAIL_KEY, email)?;
+        store_string_setting(db, KITE_PENDING_LOGIN_ID_KEY, &login.login_id)?;
+        emit(KiteEvent::AwaitingSensitiveValue {
+            field: "kite_login_code".to_string(),
+            instructions: describe_login_waiting_message(email),
+        });
+    } else {
+        emit(KiteEvent::AwaitingSensitiveValue {
+            field: "kite_login_email".to_string(),
+            instructions: "Run `/kite login --email you@example.com` or save your email in Settings > Agent > Kite Passport first.".to_string(),
+        });
+    }
+
+    let conn =
+        db.0.lock()
+            .map_err(|e: std::sync::PoisonError<_>| KiteError::Unknown(e.to_string()))?;
+    Ok(load_kite_account_summary(&conn, Some(&cli_path)))
+}
+
+fn format_account_summary(account: &KiteAccountSummary) -> String {
+    let status = if account.logged_in { "Logged in" } else { "Not logged in" };
+    [
+        "## Kite Account".to_string(),
+        format!("- Status: {status}"),
+        format!(
+            "- Email: {}",
+            account
+                .email
+                .as_deref()
+                .or(account.signup_email.as_deref())
+                .unwrap_or("Not set")
+        ),
+        format!("- User ID: {}", account.user_id.as_deref().unwrap_or("Unknown")),
+        format!(
+            "- Pending signup: {}",
+            account.pending_signup_id.as_deref().unwrap_or("None")
+        ),
+        format!(
+            "- Pending login: {}",
+            account.pending_login_id.as_deref().unwrap_or("None")
+        ),
+        format!(
+            "- Agent identity: {}",
+            account.current_agent_identity.as_deref().unwrap_or("Not registered")
+        ),
+    ]
+    .join("\n")
+}
+
+fn format_wallet_summary(wallet: &KiteWalletSummary) -> String {
+    let mut lines = vec![
+        "## Kite Wallet".to_string(),
+        format!("- Address: `{}`", wallet.wallet_address),
+        format!("- Type: {}", wallet.wallet_type),
+        format!("- Chain: {}", wallet.chain_id),
+    ];
+    if wallet.assets.is_empty() {
+        lines.push("- Assets: none reported yet".to_string());
+    } else {
+        lines.push("- Assets:".to_string());
+        for asset in &wallet.assets {
+            lines.push(format!(
+                "  - {}: {}{}",
+                asset.symbol,
+                asset.balance,
+                if asset.native { " (native)" } else { "" }
+            ));
+        }
+    }
+    if wallet.can_use_faucet {
+        lines.push("- Faucet: available on this testnet wallet".to_string());
+    }
+    lines.join("\n")
+}
+
+fn format_wallet_transfer(transfer: &KiteWalletTransfer, title: &str) -> String {
+    [
+        format!("## {title}"),
+        format!("- Amount: {} {}", transfer.amount, transfer.asset),
+        format!("- To: `{}`", transfer.recipient_address),
+        format!("- From: `{}`", transfer.wallet_address),
+        format!("- Tx hash: `{}`", transfer.transaction_hash),
+        format!("- Chain: {}", transfer.chain_id),
+    ]
+    .join("\n")
+}
+
+fn format_sessions_summary(sessions: &[KiteSessionSummary]) -> String {
+    if sessions.is_empty() {
+        return "## Kite Sessions\nNo Kite sessions were found yet.".to_string();
+    }
+    let mut lines = vec!["## Kite Sessions".to_string()];
+    for session in sessions {
+        lines.push(format!(
+            "- `{}` [{}]{}",
+            session.id,
+            session.status,
+            if session.selected { " (selected)" } else { "" }
+        ));
+        if let Some(summary) = session.task_summary.as_deref() {
+            lines.push(format!("  - Task: {summary}"));
+        }
+        if let Some(expires_at) = session.expires_at.as_deref() {
+            lines.push(format!("  - Expires: {expires_at}"));
+        }
+        if !session.assets.is_empty() {
+            lines.push(format!("  - Assets: {}", session.assets.join(", ")));
+        }
+        if let Some(limit) = session.max_total_amount.as_deref() {
+            lines.push(format!("  - Max total: {limit}"));
+        }
+        if let Some(spent) = session.spent_total.as_deref() {
+            lines.push(format!("  - Spent: {spent}"));
+        }
+    }
+    lines.join("\n")
+}
+
+fn format_session_request_status(status: &KiteSessionRequestStatus) -> String {
+    [
+        "## Kite Session Request".to_string(),
+        format!("- Request ID: `{}`", status.request_id),
+        format!("- Status: {}", status.status),
+        format!("- Session ID: {}", status.session_id.as_deref().unwrap_or("Pending")),
+        format!(
+            "- Approval URL: {}",
+            status
+                .approval_url
+                .as_deref()
+                .unwrap_or("Use the Kite Portal / passkey flow")
+        ),
+        format!("- Detail: {}", status.message),
+    ]
+    .join("\n")
+}
+
+fn format_activity_summary(events: &[KiteActivityEvent]) -> String {
+    if events.is_empty() {
+        return "## Kite Activity\nNo activity was found yet.".to_string();
+    }
+    let mut lines = vec!["## Kite Activity".to_string()];
+    for event in events {
+        lines.push(format!("- {} [{}]", event.title, event.status));
+        lines.push(format!("  - Kind: {}", event.kind));
+        lines.push(format!("  - When: {}", event.occurred_at));
+        if let Some(amount) = event.amount_display.as_deref() {
+            lines.push(format!("  - Amount: {amount}"));
+        }
+        if let Some(order_id) = event.order_id.as_deref() {
+            lines.push(format!("  - Order: `{order_id}`"));
+        }
+        if let Some(tx_hash) = event.tx_hash.as_deref() {
+            lines.push(format!("  - Tx: `{tx_hash}`"));
+        }
+    }
+    lines.join("\n")
+}
+
+fn format_shop_search_results(query: &str, items: &[KiteShopItem]) -> String {
+    if items.is_empty() {
+        return format!(
+            "## Kite Shopping\nNo products were found for `{query}`. Try a more specific search."
+        );
+    }
+    let mut lines = vec![format!("## Kite Shopping Results for `{query}`")];
+    for (index, item) in items.iter().enumerate() {
+        lines.push(format!(
+            "- {}. {} — {}",
+            index + 1,
+            item.title,
+            item.price
+        ));
+        lines.push(format!(
+            "  - Locator: {}:{}",
+            item.provider, item.external_identifier
+        ));
+        if let Some(rating) = item.rating.as_deref() {
+            lines.push(format!(
+                "  - Rating: {}{}",
+                rating,
+                item.reviews
+                    .as_deref()
+                    .map(|reviews| format!(" ({reviews} reviews)"))
+                    .unwrap_or_default()
+            ));
+        }
+    }
+    lines.join("\n")
+}
+
+fn format_cart_summary(cart: &KiteCartSummary) -> String {
+    let mut lines = vec![format!("## Kite Cart ({})", cart.item_count)];
+    if cart.items.is_empty() {
+        lines.push("- Your cart is empty.".to_string());
+    } else {
+        for item in &cart.items {
+            lines.push(format!(
+                "- {} — {} ×{}",
+                item.title, item.price, item.quantity
+            ));
+            lines.push(format!("  - Locator: {}", item.product_locator));
+        }
+    }
+    if let Some(currency) = cart.payment_currency.as_deref() {
+        lines.push(format!("- Payment currency: {currency}"));
+    }
+    if let Some(chain) = cart.payment_chain.as_deref() {
+        lines.push(format!("- Payment chain: {chain}"));
+    }
+    if let Some(shipping) = cart.shipping.as_ref() {
+        lines.push(format!(
+            "- Shipping: {}",
+            if shipping.complete {
+                "complete"
+            } else {
+                "missing details"
+            }
+        ));
+        if !shipping.missing.is_empty() {
+            lines.push(format!("  - Missing: {}", shipping.missing.join(", ")));
+        }
+    }
+    lines.join("\n")
+}
+
+fn format_orders_summary(orders: &[KiteOrderSummary]) -> String {
+    if orders.is_empty() {
+        return "## Kite Orders\nNo Kite shopping orders were found yet.".to_string();
+    }
+    let mut lines = vec!["## Kite Orders".to_string()];
+    for order in orders {
+        lines.push(format!("- `{}`", order.order_id));
+        if let Some(title) = order.title.as_deref() {
+            lines.push(format!("  - Title: {title}"));
+        }
+        if let Some(phase) = order.phase.as_deref() {
+            lines.push(format!("  - Phase: {phase}"));
+        }
+        if let Some(payment_status) = order.payment_status.as_deref() {
+            lines.push(format!("  - Payment: {payment_status}"));
+        }
+        if let Some(chain) = order.chain.as_deref() {
+            lines.push(format!("  - Chain: {chain}"));
+        }
+        if let Some(tx_hash) = order.tx_hash.as_deref() {
+            lines.push(format!("  - Tx: `{tx_hash}`"));
+        }
+    }
+    lines.join("\n")
 }
 
 fn resolve_pending_payment(
@@ -2002,6 +2764,8 @@ fn clear_kite_settings(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
     )?;
     crate::database::set_config(conn, KITE_LAST_PAYER_KEY, "")?;
     crate::database::set_config(conn, KITE_PENDING_SIGNUP_ID_KEY, "")?;
+    crate::database::set_config(conn, KITE_PENDING_LOGIN_ID_KEY, "")?;
+    crate::database::set_config(conn, KITE_ACTIVE_SPENDING_SESSION_KEY, "")?;
     Ok(())
 }
 
@@ -2134,6 +2898,55 @@ fn start_kite_signup(cli_path: &Path, email: &str) -> Result<KpassSignupInitResp
     Err(format_kpass_error("sign-up start", &stdout, &stderr))
 }
 
+fn start_kite_login(cli_path: &Path, email: &str) -> Result<KpassLoginInitResponse, KiteError> {
+    let (stdout, stderr, exit_code) = run_kpass_json_command(
+        cli_path,
+        &[
+            "login",
+            "init",
+            "--email",
+            email,
+            "--client",
+            "agent",
+            "--output",
+            "json",
+            "--no-interactive",
+        ],
+        &[],
+    )?;
+    if exit_code == Some(0) {
+        return serde_json::from_str::<KpassLoginInitResponse>(&stdout).map_err(|err| {
+            KiteError::Unknown(format!("Kite returned unreadable login details. {err}"))
+        });
+    }
+    Err(map_kpass_command_error("login start", &stdout, &stderr, exit_code))
+}
+
+fn complete_kite_login(
+    cli_path: &Path,
+    login_id: &str,
+    code: &str,
+) -> Result<KpassMeResponse, KiteError> {
+    run_kpass_json_value(
+        cli_path,
+        &[
+            "login",
+            "verify",
+            "--login-id",
+            login_id,
+            "--code",
+            code,
+            "--output",
+            "json",
+            "--no-interactive",
+        ],
+        &[],
+        "login verification",
+    )?;
+    load_current_kite_user(cli_path)?
+        .ok_or_else(|| KiteError::Unknown("Kite login succeeded but no user session was available.".to_string()))
+}
+
 fn complete_kite_signup(
     cli_path: &Path,
     signup_id: &str,
@@ -2172,6 +2985,795 @@ fn describe_signup_success(user: &KpassSignupExchangeResponse) -> String {
         "Kite Passport account created and logged in.\n\nEmail: `{}`\nUser ID: `{}`\nSession: active",
         user.email, user.user_id
     )
+}
+
+fn describe_login_waiting_message(email: &str) -> String {
+    format!(
+        "Kite login is waiting on the one-time code.\n\nAn 8-character code was sent to `{email}`.\n\nNext step\nRun `/kite login --code ABCD1234` after you receive it."
+    )
+}
+
+fn map_kpass_command_error(
+    action: &str,
+    stdout: &str,
+    stderr: &str,
+    exit_code: Option<i32>,
+) -> KiteError {
+    let parsed = serde_json::from_str::<KpassEnvelope>(stdout).ok();
+    let detail = parsed
+        .as_ref()
+        .and_then(|response| {
+            let error = response.error.trim();
+            let hint = response.hint.trim();
+            if !error.is_empty() && !hint.is_empty() {
+                Some(format!("{error} {hint}"))
+            } else if !error.is_empty() {
+                Some(error.to_string())
+            } else if !hint.is_empty() {
+                Some(hint.to_string())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| format_process_output(stdout.as_bytes(), stderr.as_bytes()));
+    let normalized = detail.to_ascii_lowercase();
+    if normalized.contains("not logged in")
+        || normalized.contains("authenticate")
+        || normalized.contains("invalid otp")
+        || normalized.contains("expired session")
+    {
+        KiteError::AuthRequired(format!("Kite {action} needs you to log in first. {detail}"))
+    } else if normalized.contains("agent not registered") {
+        KiteError::AgentNotFound(format!(
+            "Kite {action} needs a registered Thikra agent first. Open Sessions in the Kite hub or run `/kite session create ...` after logging in. {detail}"
+        ))
+    } else if normalized.contains("session not found") || normalized.contains("no active sessions") {
+        KiteError::SessionCreationRequired(format!(
+            "Kite {action} needs an active spending session first. Create one in Sessions before retrying. {detail}"
+        ))
+    } else if normalized.contains("insufficient_balance")
+        || normalized.contains("transfer amount exceeds balance")
+    {
+        KiteError::InsufficientBudget(format!(
+            "Kite {action} needs more wallet balance before it can continue. {detail}"
+        ))
+    } else if exit_code == Some(3) {
+        KiteError::AuthRequired(format!("Kite {action} failed authentication. {detail}"))
+    } else if exit_code == Some(4) {
+        KiteError::BadInput(format!("Kite {action} could not find that record. {detail}"))
+    } else {
+        KiteError::BadInput(format!("Kite {action} failed. {detail}"))
+    }
+}
+
+fn run_kpass_json_value(
+    cli_path: &Path,
+    args: &[&str],
+    envs: &[(&str, &str)],
+    action: &str,
+) -> Result<Value, KiteError> {
+    let (stdout, stderr, exit_code) = run_kpass_json_command(cli_path, args, envs)?;
+    if exit_code == Some(0) {
+        return serde_json::from_str::<Value>(&stdout).map_err(|err| {
+            KiteError::Unknown(format!("Kite returned unreadable {action} data. {err}"))
+        });
+    }
+    Err(map_kpass_command_error(action, &stdout, &stderr, exit_code))
+}
+
+fn string_field(value: &Value, key: &str) -> Option<String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(str::to_string)
+}
+
+fn bool_field(value: &Value, key: &str) -> Option<bool> {
+    value.get(key).and_then(Value::as_bool)
+}
+
+fn integer_field(value: &Value, key: &str) -> Option<i64> {
+    value.get(key).and_then(Value::as_i64)
+}
+
+fn array_field<'a>(value: &'a Value, key: &str) -> &'a [Value] {
+    value
+        .get(key)
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[])
+}
+
+fn format_decimal_amount(raw: &str, decimals: u64, symbol: &str) -> Option<String> {
+    if raw.trim().is_empty() {
+        return None;
+    }
+    let raw = raw.trim();
+    let digits = raw.strip_prefix('-').unwrap_or(raw);
+    if !digits.chars().all(|ch| ch.is_ascii_digit()) {
+        return Some(format!("{raw} {symbol}"));
+    }
+    let negative = raw.starts_with('-');
+    let decimals = decimals as usize;
+    let digits = digits.trim_start_matches('0');
+    let digits = if digits.is_empty() { "0" } else { digits };
+    let rendered = if decimals == 0 {
+        digits.to_string()
+    } else if digits.len() <= decimals {
+        let padded = format!("{digits:0>width$}", width = decimals);
+        format!("0.{}", padded.trim_end_matches('0'))
+    } else {
+        let split = digits.len() - decimals;
+        let whole = &digits[..split];
+        let frac = digits[split..].trim_end_matches('0');
+        if frac.is_empty() {
+            whole.to_string()
+        } else {
+            format!("{whole}.{frac}")
+        }
+    };
+    let signed = if negative && rendered != "0" {
+        format!("-{rendered}")
+    } else {
+        rendered
+    };
+    Some(format!("{signed} {symbol}"))
+}
+
+fn load_kite_account_summary(
+    conn: &rusqlite::Connection,
+    cli_path: Option<&Path>,
+) -> KiteAccountSummary {
+    let signup_email = load_optional_setting(conn, KITE_SIGNUP_EMAIL_KEY);
+    let pending_signup_id = load_optional_setting(conn, KITE_PENDING_SIGNUP_ID_KEY);
+    let pending_login_id = load_optional_setting(conn, KITE_PENDING_LOGIN_ID_KEY);
+    let auth_state = load_setup_status(conn, cli_path.map(Path::to_path_buf)).auth_state;
+    let me = cli_path.and_then(|path| load_current_kite_user(path).ok()).flatten();
+    let current_agent_identity = cli_path
+        .and_then(|path| load_registered_agent_identity(path).ok())
+        .flatten();
+    KiteAccountSummary {
+        logged_in: me.is_some(),
+        email: me.as_ref().map(|user| user.email.clone()),
+        user_id: me.as_ref().map(|user| user.user_id.clone()),
+        signup_email,
+        pending_signup_id,
+        pending_login_id,
+        current_agent_identity,
+        auth_state,
+    }
+}
+
+fn load_registered_agent_identity(cli_path: &Path) -> Result<Option<String>, KiteError> {
+    let value = run_kpass_json_value(
+        cli_path,
+        &["user", "agents", "--agent-type", KITE_AGENT_TYPE, "--output", "json", "--no-interactive"],
+        &[],
+        "agent list",
+    )?;
+    let Some(agent) = array_field(&value, "agents").first() else {
+        return Ok(None);
+    };
+    let id = string_field(agent, "id");
+    let agent_type = string_field(agent, "type");
+    Ok(match (id, agent_type) {
+        (Some(id), Some(agent_type)) => Some(format!("{id} ({agent_type})")),
+        (Some(id), None) => Some(id),
+        _ => None,
+    })
+}
+
+fn load_kite_wallet_summary(cli_path: &Path) -> Result<KiteWalletSummary, KiteError> {
+    let value = run_kpass_json_value(
+        cli_path,
+        &["wallet", "balance", "--output", "json", "--no-interactive"],
+        &[],
+        "wallet lookup",
+    )?;
+    let response: KpassWalletBalanceResponse = serde_json::from_value(value).map_err(|err| {
+        KiteError::Unknown(format!("Kite returned unreadable wallet data. {err}"))
+    })?;
+    Ok(KiteWalletSummary {
+        wallet_address: response.wallet_address,
+        wallet_type: response.wallet_type,
+        chain_id: response.chain_id,
+        can_use_faucet: response.chain_id == 2368,
+        assets: response.assets,
+    })
+}
+
+fn kite_wallet_send_inner(
+    cli_path: &Path,
+    to: &str,
+    amount: &str,
+    asset: &str,
+) -> Result<KiteWalletTransfer, KiteError> {
+    let value = run_kpass_json_value(
+        cli_path,
+        &[
+            "wallet",
+            "send",
+            "--to",
+            to,
+            "--amount",
+            amount,
+            "--asset",
+            asset,
+            "--output",
+            "json",
+            "--no-interactive",
+        ],
+        &[],
+        "wallet transfer",
+    )?;
+    let response: KpassWalletTransferResponse =
+        serde_json::from_value(value).map_err(|err| {
+            KiteError::Unknown(format!("Kite returned unreadable transfer data. {err}"))
+        })?;
+    Ok(KiteWalletTransfer {
+        wallet_address: response.wallet_address,
+        recipient_address: response.recipient_address,
+        asset: response.asset,
+        amount: response.amount,
+        transaction_hash: response.transaction_hash,
+        chain_id: response.chain_id,
+    })
+}
+
+fn kite_faucet_drop_inner(cli_path: &Path, token: &str) -> Result<KiteWalletTransfer, KiteError> {
+    let wallet = load_kite_wallet_summary(cli_path)?;
+    if wallet.chain_id != 2368 {
+        return Err(KiteError::BadInput(
+            "Kite's faucet is only available on testnet wallets (chain_id 2368).".to_string(),
+        ));
+    }
+    let value = run_kpass_json_value(
+        cli_path,
+        &[
+            "faucet",
+            "drop",
+            "--recipient",
+            &wallet.wallet_address,
+            "--token",
+            token,
+            "--output",
+            "json",
+            "--no-interactive",
+        ],
+        &[],
+        "faucet drop",
+    )?;
+    let response: KpassWalletTransferResponse =
+        serde_json::from_value(value).map_err(|err| {
+            KiteError::Unknown(format!("Kite returned unreadable faucet data. {err}"))
+        })?;
+    Ok(KiteWalletTransfer {
+        wallet_address: response.wallet_address,
+        recipient_address: response.recipient_address,
+        asset: response.asset,
+        amount: response.amount,
+        transaction_hash: response.transaction_hash,
+        chain_id: response.chain_id,
+    })
+}
+
+fn load_kite_sessions(cli_path: &Path, selected_session_id: Option<&str>) -> Result<Vec<KiteSessionSummary>, KiteError> {
+    let value = run_kpass_json_value(
+        cli_path,
+        &["user", "sessions", "--output", "json", "--no-interactive"],
+        &[],
+        "session list",
+    )?;
+    Ok(array_field(&value, "sessions")
+        .iter()
+        .map(|session| {
+            let payment_policy = session
+                .get("delegation")
+                .and_then(|delegation| delegation.get("payment_policy"))
+                .cloned()
+                .unwrap_or(Value::Null);
+            let task_summary = session
+                .get("delegation")
+                .and_then(|delegation| delegation.get("task"))
+                .and_then(|task| string_field(task, "summary"));
+            let assets = array_field(&payment_policy, "assets")
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            let session_id = string_field(session, "id").unwrap_or_else(|| "unknown".to_string());
+            KiteSessionSummary {
+                id: session_id.clone(),
+                status: string_field(session, "status").unwrap_or_else(|| "unknown".to_string()),
+                agent_type: string_field(session, "agent_type")
+                    .unwrap_or_else(|| KITE_AGENT_TYPE.to_string()),
+                expires_at: string_field(session, "expires_at"),
+                task_summary,
+                assets,
+                max_amount_per_tx: string_field(&payment_policy, "max_amount_per_tx"),
+                max_total_amount: string_field(&payment_policy, "max_total_amount"),
+                spent_total: session
+                    .get("usage")
+                    .and_then(|usage| string_field(usage, "spent_total")),
+                reserved_total: session
+                    .get("usage")
+                    .and_then(|usage| string_field(usage, "reserved_total")),
+                selected: selected_session_id.is_some_and(|selected| selected == session_id),
+            }
+        })
+        .collect())
+}
+
+fn ensure_kite_agent_registered(cli_path: &Path) -> Result<(), KiteError> {
+    if load_registered_agent_identity(cli_path)?.is_some() {
+        return Ok(());
+    }
+    run_kpass_json_value(
+        cli_path,
+        &[
+            "agent:register",
+            "--type",
+            KITE_AGENT_TYPE,
+            "--output",
+            "json",
+            "--no-interactive",
+        ],
+        &[],
+        "agent registration",
+    )?;
+    Ok(())
+}
+
+fn create_kite_session(
+    cli_path: &Path,
+    max_amount_per_tx: &str,
+    ttl: &str,
+    max_total_amount: Option<&str>,
+    assets: Option<&str>,
+    payment_approach: Option<&str>,
+    task_summary: Option<&str>,
+) -> Result<KiteSessionRequestStatus, KiteError> {
+    ensure_kite_agent_registered(cli_path)?;
+    let mut args = vec![
+        "agent:session".to_string(),
+        "create".to_string(),
+        "--max-amount-per-tx".to_string(),
+        max_amount_per_tx.to_string(),
+        "--ttl".to_string(),
+        ttl.to_string(),
+    ];
+    if let Some(total) = max_total_amount {
+        args.extend(["--max-total-amount".to_string(), total.to_string()]);
+    }
+    if let Some(assets) = assets {
+        args.extend(["--assets".to_string(), assets.to_string()]);
+    }
+    if let Some(payment_approach) = payment_approach {
+        args.extend([
+            "--payment-approach".to_string(),
+            payment_approach.to_string(),
+        ]);
+    }
+    if let Some(task_summary) = task_summary {
+        args.extend(["--task-summary".to_string(), task_summary.to_string()]);
+    }
+    args.extend([
+        "--output".to_string(),
+        "json".to_string(),
+        "--no-interactive".to_string(),
+    ]);
+    let refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+    let value = run_kpass_json_value(cli_path, &refs, &[], "session creation")?;
+    Ok(KiteSessionRequestStatus {
+        request_id: string_field(&value, "request_id")
+            .or_else(|| string_field(&value, "session_request_id"))
+            .unwrap_or_else(|| "pending".to_string()),
+        status: string_field(&value, "status").unwrap_or_else(|| "pending".to_string()),
+        session_id: string_field(&value, "session_id"),
+        approval_url: string_field(&value, "approval_url"),
+        message: string_field(&value, "hint")
+            .unwrap_or_else(|| "Approve the session in Kite, then check its status.".to_string()),
+    })
+}
+
+fn load_kite_session_request_status(
+    cli_path: &Path,
+    request_id: &str,
+    wait: bool,
+) -> Result<KiteSessionRequestStatus, KiteError> {
+    let mut args = vec![
+        "agent:session".to_string(),
+        "status".to_string(),
+        "--request-id".to_string(),
+        request_id.to_string(),
+    ];
+    if wait {
+        args.push("--wait".to_string());
+    }
+    args.extend([
+        "--output".to_string(),
+        "json".to_string(),
+        "--no-interactive".to_string(),
+    ]);
+    let refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+    let value = run_kpass_json_value(cli_path, &refs, &[], "session approval status")?;
+    Ok(KiteSessionRequestStatus {
+        request_id: string_field(&value, "request_id").unwrap_or_else(|| request_id.to_string()),
+        status: string_field(&value, "status")
+            .or_else(|| string_field(&value, "approval_status"))
+            .unwrap_or_else(|| "unknown".to_string()),
+        session_id: string_field(&value, "session_id"),
+        approval_url: string_field(&value, "approval_url"),
+        message: string_field(&value, "hint")
+            .unwrap_or_else(|| "Kite returned the latest session approval status.".to_string()),
+    })
+}
+
+fn kite_use_session_inner(
+    db: &crate::history::Database,
+    cli_path: &Path,
+    session_id: &str,
+) -> Result<KiteSessionSummary, KiteError> {
+    run_kpass_json_value(
+        cli_path,
+        &[
+            "agent:session",
+            "use",
+            "--session-id",
+            session_id,
+            "--output",
+            "json",
+            "--no-interactive",
+        ],
+        &[],
+        "session selection",
+    )?;
+    store_string_setting(db, KITE_ACTIVE_SPENDING_SESSION_KEY, session_id)?;
+    let sessions = load_kite_sessions(cli_path, Some(session_id))?;
+    sessions
+        .into_iter()
+        .find(|session| session.id == session_id)
+        .ok_or_else(|| KiteError::Unknown("Kite selected the session, but Thikra could not reload it.".to_string()))
+}
+
+fn load_kite_activity_events(
+    cli_path: &Path,
+    kind: Option<&str>,
+    limit: usize,
+) -> Result<Vec<KiteActivityEvent>, KiteError> {
+    let mut owned_args = vec![
+        "activity".to_string(),
+        "--limit".to_string(),
+        limit.to_string(),
+        "--output".to_string(),
+        "json".to_string(),
+        "--no-interactive".to_string(),
+    ];
+    if let Some(kind) = kind {
+        owned_args.splice(1..1, ["--kind".to_string(), kind.to_string()]);
+    }
+    let refs = owned_args.iter().map(String::as_str).collect::<Vec<_>>();
+    let value = run_kpass_json_value(cli_path, &refs, &[], "activity feed")?;
+    Ok(array_field(&value, "events")
+        .iter()
+        .map(|event| {
+            let transaction = event
+                .get("details")
+                .and_then(|details| details.get("transaction"))
+                .cloned()
+                .unwrap_or(Value::Null);
+            let shopping = transaction.get("shopping").cloned().unwrap_or(Value::Null);
+            let symbol = string_field(&transaction, "asset_symbol").unwrap_or_default();
+            let amount_display = string_field(&shopping, "total_amount_display").or_else(|| {
+                let raw = string_field(&transaction, "amount_raw")?;
+                let decimals = transaction
+                    .get("decimals")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0);
+                format_decimal_amount(&raw, decimals, &symbol)
+            });
+            KiteActivityEvent {
+                id: string_field(event, "id").unwrap_or_else(|| "activity".to_string()),
+                kind: string_field(event, "kind").unwrap_or_else(|| "unknown".to_string()),
+                status: string_field(event, "status").unwrap_or_else(|| "unknown".to_string()),
+                title: string_field(event, "title").unwrap_or_else(|| "Kite activity".to_string()),
+                occurred_at: string_field(event, "occurred_at").unwrap_or_else(|| "unknown".to_string()),
+                amount_display,
+                chain_name: string_field(&transaction, "chain_name"),
+                tx_hash: string_field(&transaction, "tx_hash"),
+                order_id: string_field(&shopping, "order_id"),
+                item_titles: array_field(&shopping, "item_titles")
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect(),
+                error_message: string_field(event, "error_message"),
+            }
+        })
+        .collect())
+}
+
+fn kite_shop_search_inner(cli_path: &Path, query: &str) -> Result<Vec<KiteShopItem>, KiteError> {
+    let value = run_kpass_json_value(
+        cli_path,
+        &[
+            "shop:search",
+            "--query",
+            query,
+            "--output",
+            "json",
+            "--no-interactive",
+        ],
+        &[],
+        "shopping search",
+    )?;
+    Ok(array_field(&value, "items")
+        .iter()
+        .map(|item| KiteShopItem {
+            provider: string_field(item, "provider").unwrap_or_else(|| "unknown".to_string()),
+            external_identifier: string_field(item, "external_identifier")
+                .unwrap_or_else(|| "unknown".to_string()),
+            title: string_field(item, "title").unwrap_or_else(|| "Untitled product".to_string()),
+            price: string_field(item, "price").unwrap_or_else(|| "Unknown".to_string()),
+            rating: item
+                .get("rating")
+                .map(|rating| match rating {
+                    Value::Number(number) => number.to_string(),
+                    Value::String(text) => text.clone(),
+                    _ => String::new(),
+                })
+                .filter(|text| !text.is_empty()),
+            reviews: item
+                .get("reviews")
+                .map(|reviews| match reviews {
+                    Value::Number(number) => number.to_string(),
+                    Value::String(text) => text.clone(),
+                    _ => String::new(),
+                })
+                .filter(|text| !text.is_empty()),
+            link: string_field(item, "link"),
+            thumbnail: string_field(item, "thumbnail"),
+        })
+        .collect())
+}
+
+fn load_kite_shipping_summary(cli_path: &Path) -> Result<KiteShippingSummary, KiteError> {
+    let value = run_kpass_json_value(
+        cli_path,
+        &["shop:shipping", "view", "--output", "json", "--no-interactive"],
+        &[],
+        "shipping profile",
+    )?;
+    Ok(KiteShippingSummary {
+        name: string_field(&value, "name"),
+        email: string_field(&value, "email"),
+        line1: string_field(&value, "line1"),
+        line2: string_field(&value, "line2"),
+        city: string_field(&value, "city"),
+        state: string_field(&value, "state"),
+        postal_code: string_field(&value, "postal_code"),
+        country: string_field(&value, "country"),
+        complete: bool_field(&value, "complete").unwrap_or(false),
+        missing: array_field(&value, "missing")
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect(),
+    })
+}
+
+fn load_kite_cart_summary(cli_path: &Path) -> Result<KiteCartSummary, KiteError> {
+    let value = run_kpass_json_value(
+        cli_path,
+        &["shop:cart", "view", "--output", "json", "--no-interactive"],
+        &[],
+        "shopping cart",
+    )?;
+    let items = array_field(&value, "items")
+        .iter()
+        .map(|item| KiteCartItem {
+            provider: string_field(item, "provider").unwrap_or_else(|| "unknown".to_string()),
+            external_identifier: string_field(item, "external_identifier")
+                .unwrap_or_else(|| "unknown".to_string()),
+            product_locator: string_field(item, "product_locator")
+                .unwrap_or_else(|| "unknown".to_string()),
+            title: string_field(item, "title").unwrap_or_else(|| "Untitled item".to_string()),
+            price: string_field(item, "price").unwrap_or_else(|| "Unknown".to_string()),
+            quantity: integer_field(item, "quantity").unwrap_or(1),
+            link: string_field(item, "link"),
+            thumbnail: string_field(item, "thumbnail"),
+        })
+        .collect::<Vec<_>>();
+    let shipping = load_kite_shipping_summary(cli_path).ok();
+    Ok(KiteCartSummary {
+        item_count: integer_field(&value, "item_count")
+            .and_then(|count| usize::try_from(count).ok())
+            .unwrap_or(items.len()),
+        payment_currency: value
+            .get("payment")
+            .and_then(|payment| string_field(payment, "currency")),
+        payment_chain: value
+            .get("payment")
+            .and_then(|payment| string_field(payment, "chain")),
+        shipping,
+        items,
+    })
+}
+
+fn kite_cart_add_inner(
+    cli_path: &Path,
+    provider: &str,
+    external_id: &str,
+    quantity: i64,
+) -> Result<KiteCartSummary, KiteError> {
+    ensure_kite_agent_registered(cli_path)?;
+    let mut args = vec![
+        "shop:cart".to_string(),
+        "add".to_string(),
+        "--provider".to_string(),
+        provider.to_string(),
+        "--external-id".to_string(),
+        external_id.to_string(),
+    ];
+    if quantity > 1 {
+        args.extend(["--quantity".to_string(), quantity.to_string()]);
+    }
+    args.extend([
+        "--output".to_string(),
+        "json".to_string(),
+        "--no-interactive".to_string(),
+    ]);
+    let refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+    run_kpass_json_value(cli_path, &refs, &[], "cart add")?;
+    load_kite_cart_summary(cli_path)
+}
+
+fn kite_cart_remove_inner(
+    cli_path: &Path,
+    provider: &str,
+    external_id: &str,
+) -> Result<KiteCartSummary, KiteError> {
+    ensure_kite_agent_registered(cli_path)?;
+    run_kpass_json_value(
+        cli_path,
+        &[
+            "shop:cart",
+            "remove",
+            "--provider",
+            provider,
+            "--external-id",
+            external_id,
+            "--output",
+            "json",
+            "--no-interactive",
+        ],
+        &[],
+        "cart remove",
+    )?;
+    load_kite_cart_summary(cli_path)
+}
+
+fn load_kite_order_status(cli_path: &Path, order_id: &str) -> Result<KiteOrderSummary, KiteError> {
+    let value = run_kpass_json_value(
+        cli_path,
+        &[
+            "shop:order",
+            "status",
+            "--order-id",
+            order_id,
+            "--output",
+            "json",
+            "--no-interactive",
+        ],
+        &[],
+        "order status",
+    )?;
+    Ok(KiteOrderSummary {
+        order_id: string_field(&value, "order_id").unwrap_or_else(|| order_id.to_string()),
+        phase: string_field(&value, "phase"),
+        payment_status: string_field(&value, "payment_status"),
+        tx_hash: string_field(&value, "tx_hash"),
+        currency: string_field(&value, "currency"),
+        chain: string_field(&value, "chain"),
+        delivery_status: None,
+        title: None,
+    })
+}
+
+fn derive_order_summaries(events: &[KiteActivityEvent]) -> Vec<KiteOrderSummary> {
+    events
+        .iter()
+        .filter(|event| event.kind == "shopping_checkout")
+        .filter_map(|event| {
+            event.order_id.as_ref().map(|order_id| KiteOrderSummary {
+                order_id: order_id.clone(),
+                phase: Some(event.status.clone()),
+                payment_status: Some(event.status.clone()),
+                tx_hash: event.tx_hash.clone(),
+                currency: event.amount_display.clone(),
+                chain: event.chain_name.clone(),
+                delivery_status: None,
+                title: Some(event.title.clone()),
+            })
+        })
+        .collect()
+}
+
+fn kite_logout_inner(
+    db: &crate::history::Database,
+    cli_path: &Path,
+) -> Result<KiteAccountSummary, KiteError> {
+    run_kpass_json_value(
+        cli_path,
+        &["logout", "--output", "json", "--no-interactive"],
+        &[],
+        "logout",
+    )?;
+    store_string_setting(db, KITE_PENDING_LOGIN_ID_KEY, "")?;
+    let conn =
+        db.0.lock()
+            .map_err(|e: std::sync::PoisonError<_>| KiteError::Unknown(e.to_string()))?;
+    Ok(load_kite_account_summary(&conn, Some(cli_path)))
+}
+
+fn get_kite_hub_state_inner(db: &crate::history::Database) -> Result<KiteHubState, KiteError> {
+    let cli_path = detect_kite_cli();
+    let conn =
+        db.0.lock()
+            .map_err(|e: std::sync::PoisonError<_>| KiteError::Unknown(e.to_string()))?;
+    let setup = load_setup_status(&conn, cli_path.clone());
+    let account = load_kite_account_summary(&conn, cli_path.as_deref());
+    let selected_session_id = load_optional_setting(&conn, KITE_ACTIVE_SPENDING_SESSION_KEY);
+    drop(conn);
+
+    let mut issues = Vec::new();
+    let mut wallet = None;
+    let mut sessions = Vec::new();
+    let mut activity = Vec::new();
+    let mut cart = None;
+    let mut orders = Vec::new();
+
+    if let Some(cli_path) = cli_path.as_deref() {
+        match load_kite_wallet_summary(cli_path) {
+            Ok(summary) => wallet = Some(summary),
+            Err(err) => issues.push(err.message().to_string()),
+        }
+        match load_kite_sessions(cli_path, selected_session_id.as_deref()) {
+            Ok(summary) => sessions = summary,
+            Err(err) => issues.push(err.message().to_string()),
+        }
+        match load_kite_activity_events(cli_path, None, 8) {
+            Ok(events) => {
+                orders = derive_order_summaries(&events);
+                activity = events;
+            }
+            Err(err) => issues.push(err.message().to_string()),
+        }
+        match load_kite_cart_summary(cli_path) {
+            Ok(summary) => cart = Some(summary),
+            Err(err) => issues.push(err.message().to_string()),
+        }
+    }
+
+    Ok(KiteHubState {
+        developer: KiteDeveloperSummary {
+            auth_state: setup.auth_state.clone(),
+            connected: setup.connected,
+            masked_mcp_url: setup.masked_mcp_url.clone(),
+            last_payer_addr: setup.last_payer_addr.clone(),
+            current_session_id: selected_session_id,
+        },
+        setup,
+        account,
+        wallet,
+        sessions,
+        activity,
+        cart,
+        orders,
+        issues,
+    })
 }
 
 fn load_setup_status(conn: &rusqlite::Connection, cli: Option<PathBuf>) -> KiteSetupStatus {
@@ -2938,8 +4540,25 @@ fn kite_help_text() -> String {
         "/kite setup",
         "/kite setup --email you@example.com",
         "/kite setup --code ABCD1234",
+        "/kite login --email you@example.com",
+        "/kite login --code ABCD1234",
+        "/kite logout",
+        "/kite me",
         "/kite connect",
         "/kite status",
+        "/kite wallet",
+        "/kite send --to 0xabc --amount 5 --asset USDC",
+        "/kite faucet --token USDC",
+        "/kite sessions",
+        "/kite session create --max-amount 5 --ttl 1h --total 50 --assets USDC --task \"Use paid APIs\"",
+        "/kite session use --session-id session_123",
+        "/kite session status --request-id req_123 --wait yes",
+        "/kite activity",
+        "/kite shop search --query \"usb c cable\"",
+        "/kite cart",
+        "/kite checkout --confirmed yes",
+        "/kite orders",
+        "/kite orders --order-id ord_123",
         "/kite payer",
         "/kite approve --payee <addr> --amount <amount> --token <symbol> [--merchant <name>]",
         "/kite call --url <https://...> [--method GET|POST] [--body <json>] [--merchant <name>]",
@@ -2980,8 +4599,84 @@ fn parse_kite_command(input: &str) -> Result<KiteCommand, KiteError> {
             email: args.optional("email"),
             code: args.optional("code"),
         }),
+        "login" => Ok(KiteCommand::Login {
+            email: args.optional("email"),
+            code: args.optional("code"),
+        }),
+        "logout" => Ok(KiteCommand::Logout),
+        "me" => Ok(KiteCommand::Me),
         "connect" => Ok(KiteCommand::Connect),
         "status" => Ok(KiteCommand::Status),
+        "wallet" => Ok(KiteCommand::Wallet),
+        "send" => Ok(KiteCommand::Send {
+            to: args.required("to")?,
+            amount: args.required("amount")?,
+            asset: args.required("asset")?,
+        }),
+        "faucet" => Ok(KiteCommand::Faucet {
+            token: args.required("token")?,
+        }),
+        "sessions" => Ok(KiteCommand::Sessions),
+        "session" => {
+            let action = args.free_first().ok_or_else(|| {
+                KiteError::BadInput(
+                    "Use `/kite session create`, `/kite session use`, or `/kite session status`.".to_string(),
+                )
+            })?;
+            match action.as_str() {
+                "create" => Ok(KiteCommand::SessionCreate {
+                    max_amount_per_tx: args.required("max-amount")?,
+                    ttl: args.required("ttl")?,
+                    max_total_amount: args.optional("total"),
+                    assets: args.optional("assets"),
+                    payment_approach: args.optional("payment-approach"),
+                    task_summary: args.optional("task"),
+                }),
+                "use" => Ok(KiteCommand::SessionUse {
+                    session_id: args.required("session-id")?,
+                }),
+                "status" => Ok(KiteCommand::SessionStatus {
+                    request_id: args.required("request-id")?,
+                    wait: args
+                        .optional("wait")
+                        .as_deref()
+                        .map(parse_boolish)
+                        .transpose()?
+                        .unwrap_or(false),
+                }),
+                other => Err(KiteError::BadInput(format!(
+                    "Unknown Kite session action `{other}`. Use create, use, or status."
+                ))),
+            }
+        }
+        "activity" => Ok(KiteCommand::Activity {
+            kind: args.optional("kind"),
+        }),
+        "shop" => {
+            let action = args.free_first().ok_or_else(|| {
+                KiteError::BadInput("Use `/kite shop search --query ...`.".to_string())
+            })?;
+            match action.as_str() {
+                "search" => Ok(KiteCommand::ShopSearch {
+                    query: args.required("query")?,
+                }),
+                other => Err(KiteError::BadInput(format!(
+                    "Unknown Kite shop action `{other}`. Use `/kite shop search --query ...`."
+                ))),
+            }
+        }
+        "cart" => Ok(KiteCommand::Cart),
+        "checkout" => Ok(KiteCommand::Checkout {
+            confirmed: args
+                .optional("confirmed")
+                .as_deref()
+                .map(parse_boolish)
+                .transpose()?
+                .unwrap_or(false),
+        }),
+        "orders" => Ok(KiteCommand::Orders {
+            order_id: args.optional("order-id"),
+        }),
         "payer" => Ok(KiteCommand::Payer),
         "approve" => Ok(KiteCommand::Approve {
             payee_addr: args.required("payee")?,
@@ -3050,6 +4745,7 @@ fn tokenize_command(input: &str) -> Result<Vec<String>, KiteError> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct FlagArgs {
     values: HashMap<String, String>,
+    positionals: Vec<String>,
 }
 
 impl FlagArgs {
@@ -3067,30 +4763,44 @@ impl FlagArgs {
             .cloned()
             .filter(|value| !value.trim().is_empty())
     }
+
+    fn free_first(&self) -> Option<String> {
+        self.positionals.first().cloned()
+    }
 }
 
 fn parse_flag_args(tokens: &[String]) -> Result<FlagArgs, KiteError> {
     let mut values = HashMap::new();
+    let mut positionals = Vec::new();
     let mut idx = 0;
     while idx < tokens.len() {
-        let flag = tokens[idx].strip_prefix("--").ok_or_else(|| {
-            KiteError::BadInput(format!(
-                "Unexpected token `{}`. Use `--flag value` pairs for Kite commands.",
-                tokens[idx]
-            ))
-        })?;
-        let value = tokens
-            .get(idx + 1)
-            .ok_or_else(|| KiteError::BadInput(format!("Missing value for `--{flag}`.")))?;
-        if value.starts_with("--") {
-            return Err(KiteError::BadInput(format!(
-                "Missing value for `--{flag}`."
-            )));
+        if let Some(flag) = tokens[idx].strip_prefix("--") {
+            let value = tokens
+                .get(idx + 1)
+                .ok_or_else(|| KiteError::BadInput(format!("Missing value for `--{flag}`.")))?;
+            if value.starts_with("--") {
+                return Err(KiteError::BadInput(format!(
+                    "Missing value for `--{flag}`."
+                )));
+            }
+            values.insert(flag.to_string(), value.clone());
+            idx += 2;
+        } else {
+            positionals.push(tokens[idx].clone());
+            idx += 1;
         }
-        values.insert(flag.to_string(), value.clone());
-        idx += 2;
     }
-    Ok(FlagArgs { values })
+    Ok(FlagArgs { values, positionals })
+}
+
+fn parse_boolish(raw: &str) -> Result<bool, KiteError> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "y" => Ok(true),
+        "0" | "false" | "no" | "n" => Ok(false),
+        _ => Err(KiteError::BadInput(format!(
+            "Use `yes` or `no` for boolean Kite flags like `{raw}`."
+        ))),
+    }
 }
 
 fn parse_http_method(raw: &str) -> Result<Method, KiteError> {
@@ -3262,6 +4972,72 @@ mod tests {
             KiteCommand::Setup {
                 email: None,
                 code: Some("A1B2C3D4".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_account_wallet_and_shopping_commands() {
+        assert_eq!(
+            parse_kite_command("/kite login --email and00sama@gmail.com").unwrap(),
+            KiteCommand::Login {
+                email: Some("and00sama@gmail.com".to_string()),
+                code: None,
+            }
+        );
+        assert_eq!(parse_kite_command("/kite logout").unwrap(), KiteCommand::Logout);
+        assert_eq!(parse_kite_command("/kite me").unwrap(), KiteCommand::Me);
+        assert_eq!(parse_kite_command("/kite wallet").unwrap(), KiteCommand::Wallet);
+        assert_eq!(
+            parse_kite_command("/kite send --to 0xabc --amount 5 --asset USDC").unwrap(),
+            KiteCommand::Send {
+                to: "0xabc".to_string(),
+                amount: "5".to_string(),
+                asset: "USDC".to_string(),
+            }
+        );
+        assert_eq!(
+            parse_kite_command("/kite shop search --query 'usb c cable'").unwrap(),
+            KiteCommand::ShopSearch {
+                query: "usb c cable".to_string(),
+            }
+        );
+        assert_eq!(parse_kite_command("/kite cart").unwrap(), KiteCommand::Cart);
+        assert_eq!(
+            parse_kite_command("/kite orders --order-id ord_123").unwrap(),
+            KiteCommand::Orders {
+                order_id: Some("ord_123".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_session_commands() {
+        assert_eq!(
+            parse_kite_command("/kite session use --session-id session_123").unwrap(),
+            KiteCommand::SessionUse {
+                session_id: "session_123".to_string(),
+            }
+        );
+        assert_eq!(
+            parse_kite_command(
+                "/kite session create --max-amount 5 --ttl 1h --total 25 --assets USDC --payment-approach x402 --task 'Use paid weather API'"
+            )
+            .unwrap(),
+            KiteCommand::SessionCreate {
+                max_amount_per_tx: "5".to_string(),
+                ttl: "1h".to_string(),
+                max_total_amount: Some("25".to_string()),
+                assets: Some("USDC".to_string()),
+                payment_approach: Some("x402".to_string()),
+                task_summary: Some("Use paid weather API".to_string()),
+            }
+        );
+        assert_eq!(
+            parse_kite_command("/kite session status --request-id req_123 --wait yes").unwrap(),
+            KiteCommand::SessionStatus {
+                request_id: "req_123".to_string(),
+                wait: true,
             }
         );
     }

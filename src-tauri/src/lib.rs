@@ -861,7 +861,23 @@ pub fn run() {
             #[cfg(not(coverage))]
             kite::verify_kite_connection,
             #[cfg(not(coverage))]
+            kite::get_kite_hub_state,
+            #[cfg(not(coverage))]
             kite::get_kite_agent_capability,
+            #[cfg(not(coverage))]
+            kite::kite_logout,
+            #[cfg(not(coverage))]
+            kite::kite_wallet_send,
+            #[cfg(not(coverage))]
+            kite::kite_faucet_drop,
+            #[cfg(not(coverage))]
+            kite::kite_use_session,
+            #[cfg(not(coverage))]
+            kite::kite_shop_search,
+            #[cfg(not(coverage))]
+            kite::kite_cart_add,
+            #[cfg(not(coverage))]
+            kite::kite_cart_remove,
             #[cfg(not(coverage))]
             kite::start_kite_agent_mode,
             #[cfg(not(coverage))]

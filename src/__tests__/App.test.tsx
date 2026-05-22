@@ -6,7 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import App from '../App';
+import App, { detectKiteCommandIntent } from '../App';
 import { DEFAULT_CONFIG } from '../contexts/ConfigContext';
 import {
   invoke,
@@ -5330,6 +5330,18 @@ describe('App', () => {
   });
 
   describe('/kite command', () => {
+    it('detects clear Kite transactional intents for auto-routing', () => {
+      expect(detectKiteCommandIntent("what's my wallet balance?")).toBe(
+        '/kite wallet',
+      );
+      expect(detectKiteCommandIntent('send 5 usdc to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e')).toBe(
+        '/kite send --to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e --amount 5 --asset USDC',
+      );
+      expect(detectKiteCommandIntent('buy me a usb c cable')).toBe(
+        '/kite shop search --query "buy me a usb c cable"',
+      );
+    });
+
     it('routes /kite status through run_kite_command instead of ask_ollama', async () => {
       enableChannelCapture();
       render(<App />);
@@ -5369,6 +5381,27 @@ describe('App', () => {
         'run_kite_command',
         expect.objectContaining({ input: '/kite setup' }),
       );
+    });
+
+    it('auto-routes clear wallet intents into the Kite backend', async () => {
+      enableChannelCapture();
+      render(<App />);
+      await act(async () => {});
+      await showOverlay();
+
+      const textarea = screen.getByPlaceholderText('Ask Mate anything...');
+      act(() => {
+        fireEvent.change(textarea, { target: { value: "what's my wallet balance?" } });
+      });
+      await act(async () => {
+        fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+      });
+
+      expect(invoke).toHaveBeenCalledWith(
+        'run_kite_command',
+        expect.objectContaining({ input: '/kite wallet' }),
+      );
+      expect(invoke).not.toHaveBeenCalledWith('ask_ollama', expect.anything());
     });
 
     it('bypasses the OpenRouter privacy warning for /kite commands', async () => {

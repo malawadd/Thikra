@@ -93,6 +93,86 @@ export function parseCommands(text: string): {
   return { found, strippedMessage: remaining.join(' ') };
 }
 
+export function detectKiteCommandIntent(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+
+  const walletIntent =
+    (lower.includes('wallet') || lower.includes('balance') || lower.includes('funds')) &&
+    (lower.includes('my') ||
+      lower.includes('show') ||
+      lower.includes('what') ||
+      lower.includes('how much'));
+  if (walletIntent) {
+    return '/kite wallet';
+  }
+
+  const sendMatch = trimmed.match(
+    /\b(?:send|transfer)\s+([0-9]+(?:\.[0-9]+)?)\s+([A-Za-z0-9_-]+)\s+to\s+(0x[a-fA-F0-9]{6,})\b/i,
+  );
+  if (sendMatch) {
+    return `/kite send --to ${sendMatch[3]} --amount ${sendMatch[1]} --asset ${sendMatch[2].toUpperCase()}`;
+  }
+
+  const faucetMatch = trimmed.match(
+    /\bfaucet(?:\s+|.*\btoken\s+)([A-Za-z0-9_-]+)\b/i,
+  );
+  if (faucetMatch) {
+    return `/kite faucet --token ${faucetMatch[1].toUpperCase()}`;
+  }
+
+  const urlMatch = trimmed.match(/https?:\/\/\S+/i);
+  if (
+    urlMatch &&
+    (lower.includes('x402') ||
+      lower.includes('paid api') ||
+      lower.includes('paid endpoint'))
+  ) {
+    return `/kite call --url ${urlMatch[0]}`;
+  }
+
+  if (
+    lower.includes('recent activity') ||
+    lower.includes('transaction history') ||
+    lower.includes('recent purchases') ||
+    (lower.includes('activity') && lower.includes('kite'))
+  ) {
+    return '/kite activity';
+  }
+
+  if (
+    lower.includes('order status') ||
+    lower.includes('my orders') ||
+    lower.includes('delivery status') ||
+    lower.includes('purchases')
+  ) {
+    return '/kite orders';
+  }
+
+  if (lower.includes('cart') || lower.includes('checkout')) {
+    return '/kite cart';
+  }
+
+  if (
+    lower.includes('session') ||
+    lower.includes('budget remaining') ||
+    lower.includes('session approval')
+  ) {
+    return '/kite sessions';
+  }
+
+  if (
+    lower.startsWith('buy ') ||
+    lower.startsWith('shop ') ||
+    lower.includes('i want to buy')
+  ) {
+    return `/kite shop search --query "${trimmed.replace(/"/g, '\\"')}"`;
+  }
+
+  return null;
+}
+
 type OverlayVisibilityPayload =
   | {
       state: 'show';
@@ -1108,10 +1188,15 @@ function App() {
     const trimmedQuery = query.trim();
     const { found, strippedMessage } = parseCommands(trimmedQuery);
     const hasKite = found.has('/kite');
+    const routedKiteCommand =
+      !hasKite && !found.has('/screen') && !found.has('/do')
+        ? detectKiteCommandIntent(strippedMessage)
+        : null;
+    const effectiveHasKite = hasKite || routedKiteCommand !== null;
 
     // Show a one-time-per-session privacy warning before the first cloud message.
     if (
-      !hasKite &&
+      !effectiveHasKite &&
       provider.mode === 'openrouter' &&
       !sessionStorage.getItem('onlinePrivacyAcked')
     ) {
@@ -1168,7 +1253,7 @@ function App() {
     if (
       !strippedMessage &&
       attachedImages.length === 0 &&
-      !hasKite &&
+      !effectiveHasKite &&
       !hasScreen &&
       !((utilityTrigger || hasThink) && selectedContext?.trim())
     )
@@ -1177,7 +1262,7 @@ function App() {
     // Auto-detect computer-use intent. If the user is asking about screen content
     // or requesting a vision analysis (but not explicitly using /screen or /do),
     // automatically capture a screenshot and send it to the vision model.
-    if (!hasKite && !hasScreen && !found.has('/do') && !utilityTrigger) {
+    if (!effectiveHasKite && !hasScreen && !found.has('/do') && !utilityTrigger) {
       const intent = detectComputerUseIntent(strippedMessage);
       if (intent === 'vision') {
         // Treat as a /screen request with the user's message as the query.
@@ -1227,7 +1312,7 @@ function App() {
       return;
     }
 
-    if (hasKite) {
+    if (hasKite || routedKiteCommand) {
       setQuery('');
       setSelectedContext(null);
       for (const img of attachedImages) {
@@ -1235,7 +1320,7 @@ function App() {
       }
       setAttachedImages([]);
       void askKite(
-        trimmedQuery,
+        routedKiteCommand ?? trimmedQuery,
         trimmedQuery,
         selectedContext?.trim() || undefined,
       );

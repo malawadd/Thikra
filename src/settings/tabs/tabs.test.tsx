@@ -745,6 +745,122 @@ describe('AgentTab', () => {
           reason: 'Using screenshot-capable desktop automation.',
         };
       }
+      if (cmd === 'get_kite_hub_state') {
+        return {
+          setup: {
+            cliInstalled: true,
+            cliPath: 'C:\\Users\\IAM\\.kpass\\bin\\kpass.exe',
+            mcpUrlConfigured: true,
+            maskedMcpUrl: 'https://neo.dev.gokite.ai/…',
+            authState: 'ready',
+            connected: true,
+            lastPayerAddr: '0x123',
+            signupEmail: 'and00sama@gmail.com',
+            pendingSignupId: 'signup_123',
+            inviteOnly: true,
+            docsUrl: 'https://docs.gokite.ai/kite-agent-passport/developer-guide',
+            portalUrl: 'https://x402-portal-eight.vercel.app/',
+            installerUrl: 'https://cli.gokite.ai/install.sh',
+          },
+          account: {
+            loggedIn: true,
+            email: 'and00sama@gmail.com',
+            userId: 'user_123',
+            signupEmail: 'and00sama@gmail.com',
+            pendingSignupId: 'signup_123',
+            pendingLoginId: null,
+            currentAgentIdentity: 'agent_123 (codex)',
+            authState: 'ready',
+          },
+          wallet: {
+            walletAddress: '0xabc123',
+            walletType: 'custodial',
+            chainId: 2368,
+            canUseFaucet: true,
+            assets: [
+              { symbol: 'USDC', balance: '25.00', native: false },
+              { symbol: 'KITE', balance: '150.00', native: true },
+            ],
+          },
+          sessions: [
+            {
+              id: 'session_123',
+              status: 'active',
+              agentType: 'codex',
+              expiresAt: '2026-05-22T10:00:00Z',
+              taskSummary: 'Use paid APIs',
+              assets: ['USDC'],
+              maxAmountPerTx: '5',
+              maxTotalAmount: '50',
+              spentTotal: '3',
+              reservedTotal: '0',
+              selected: true,
+            },
+          ],
+          activity: [
+            {
+              id: 'activity_1',
+              kind: 'shopping_checkout',
+              status: 'completed',
+              title: 'Shopping checkout — 1 item',
+              occurredAt: '2026-05-22T09:00:00Z',
+              amountDisplay: '$12.49',
+              chainName: 'ethereum-sepolia',
+              txHash: '0xhash',
+              orderId: 'ord_123',
+              itemTitles: ['USB-C Cable'],
+              errorMessage: null,
+            },
+          ],
+          cart: {
+            items: [
+              {
+                provider: 'amazon',
+                externalIdentifier: 'B01GGKZ2SC',
+                productLocator: 'amazon:B01GGKZ2SC',
+                title: 'USB-C Cable',
+                price: '$5.85',
+                quantity: 1,
+              },
+            ],
+            itemCount: 1,
+            paymentCurrency: 'USDC',
+            paymentChain: 'ethereum-sepolia',
+            shipping: {
+              name: 'Andoo Sama',
+              email: 'and00sama@gmail.com',
+              line1: '123 Main St',
+              line2: null,
+              city: 'Riyadh',
+              state: 'RD',
+              postalCode: '12345',
+              country: 'SA',
+              complete: true,
+              missing: [],
+            },
+          },
+          orders: [
+            {
+              orderId: 'ord_123',
+              phase: 'completed',
+              paymentStatus: 'confirmed',
+              txHash: '0xhash',
+              currency: '$12.49',
+              chain: 'ethereum-sepolia',
+              deliveryStatus: null,
+              title: 'Shopping checkout — 1 item',
+            },
+          ],
+          developer: {
+            authState: 'ready',
+            connected: true,
+            maskedMcpUrl: 'https://neo.dev.gokite.ai/…',
+            lastPayerAddr: '0x123',
+            currentSessionId: 'session_123',
+          },
+          issues: [],
+        };
+      }
       if (cmd === 'start_kite_agent_mode') {
         return 'Kite agentic mode is taking over.';
       }
@@ -776,6 +892,9 @@ describe('AgentTab', () => {
     expect(screen.getByText('signup_123')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Use AI to finish setup' })).toBeInTheDocument();
     expect(screen.getByText(/Autopilot available via openrouter/i)).toBeInTheDocument();
+    expect(screen.getByText('Account')).toBeInTheDocument();
+    expect(screen.getByText('Wallet')).toBeInTheDocument();
+    expect(screen.getByText('Shopping')).toBeInTheDocument();
   });
 
   it('saves, verifies, and disconnects Kite settings through Tauri commands', async () => {
@@ -882,6 +1001,48 @@ describe('AgentTab', () => {
           reason: 'No vision-capable provider is connected.',
         };
       }
+      if (cmd === 'get_kite_hub_state') {
+        return {
+          setup: {
+            cliInstalled: false,
+            cliPath: null,
+            mcpUrlConfigured: false,
+            maskedMcpUrl: null,
+            authState: 'cli_missing',
+            connected: false,
+            lastPayerAddr: null,
+            signupEmail: null,
+            pendingSignupId: null,
+            inviteOnly: true,
+            docsUrl: 'https://docs.gokite.ai/kite-agent-passport/developer-guide',
+            portalUrl: 'https://x402-portal-eight.vercel.app/',
+            installerUrl: 'https://cli.gokite.ai/install.sh',
+          },
+          account: {
+            loggedIn: false,
+            email: null,
+            userId: null,
+            signupEmail: null,
+            pendingSignupId: null,
+            pendingLoginId: null,
+            currentAgentIdentity: null,
+            authState: 'cli_missing',
+          },
+          wallet: null,
+          sessions: [],
+          activity: [],
+          cart: null,
+          orders: [],
+          developer: {
+            authState: 'cli_missing',
+            connected: false,
+            maskedMcpUrl: null,
+            lastPayerAddr: null,
+            currentSessionId: null,
+          },
+          issues: [],
+        };
+      }
       if (cmd === 'install_kite_cli') {
         return 'C:\\Users\\IAM\\.kpass\\bin\\kpass.exe';
       }
@@ -942,6 +1103,48 @@ describe('AgentTab', () => {
           provider: 'ollama',
           model: null,
           reason: 'Ollama is unreachable.',
+        };
+      }
+      if (cmd === 'get_kite_hub_state') {
+        return {
+          setup: {
+            cliInstalled: false,
+            cliPath: null,
+            mcpUrlConfigured: false,
+            maskedMcpUrl: null,
+            authState: 'cli_missing',
+            connected: false,
+            lastPayerAddr: null,
+            signupEmail: null,
+            pendingSignupId: null,
+            inviteOnly: true,
+            docsUrl: 'https://docs.gokite.ai/kite-agent-passport/developer-guide',
+            portalUrl: 'https://x402-portal-eight.vercel.app/',
+            installerUrl: 'https://cli.gokite.ai/install.sh',
+          },
+          account: {
+            loggedIn: false,
+            email: null,
+            userId: null,
+            signupEmail: null,
+            pendingSignupId: null,
+            pendingLoginId: null,
+            currentAgentIdentity: null,
+            authState: 'cli_missing',
+          },
+          wallet: null,
+          sessions: [],
+          activity: [],
+          cart: null,
+          orders: [],
+          developer: {
+            authState: 'cli_missing',
+            connected: false,
+            maskedMcpUrl: null,
+            lastPayerAddr: null,
+            currentSessionId: null,
+          },
+          issues: [],
         };
       }
       if (cmd === 'start_kite_agent_mode') {

@@ -135,20 +135,27 @@ export const COMMANDS: readonly Command[] = [
   defineCommand({
     trigger: '/kite',
     label: '/kite',
-    description: 'Kite Passport setup, status, payments, and x402 calls',
+    description: 'Kite Passport hub: account, wallet, sessions, shopping, and x402',
     docs: {
       summary:
-        'Routes the request into Thuki’s Kite Passport integration for setup, connection status, payment approval, and x402 service calls.',
+        'Routes the request into Thikra’s native Kite Passport integration for setup, auth, wallet actions, sessions, shopping, and x402 service calls.',
       usage:
-        '/kite <setup|connect|status|payer|approve|call> [flags]',
+        '/kite <setup|login|logout|me|connect|status|wallet|send|faucet|sessions|session|activity|shop|cart|checkout|orders|payer|approve|call> [flags]',
       examples: [
         '`/kite setup`',
+        '`/kite login --email you@example.com`',
+        '`/kite wallet`',
+        '`/kite send --to 0xabc --amount 5 --asset USDC`',
+        '`/kite sessions`',
+        '`/kite shop search --query "usb c cable"`',
+        '`/kite cart`',
+        '`/kite orders`',
         '`/kite status`',
         '`/kite approve --payee 0xabc --amount 100 --token USDC`',
         '`/kite call --url https://example.com/paid --method POST --body \'{"city":"Riyadh"}\'`',
       ],
       behavior:
-        'Bypasses the normal chat model path and calls the native Kite backend flow directly. Users still create their Passport account and agent in Kite’s Portal, then paste the MCP URL into Settings.',
+        'Bypasses the normal chat model path and calls the native Kite backend flow directly. Thikra can install Kite Passport, start signup/login, surface wallet and session state, and run Kite-native shopping and payment flows.',
       composability:
         'Standalone backend command; it is not a prompt-template command.',
       limit:
@@ -156,7 +163,7 @@ export const COMMANDS: readonly Command[] = [
     },
     promptHelp: {
       summary:
-        'Run a Kite Passport backend action such as setup, status, payer lookup, payment approval, or an x402 call.',
+        'Run a Kite Passport backend action such as setup, auth, wallet, sessions, shopping, status, payment approval, or an x402 call.',
     },
   }),
   defineCommand({

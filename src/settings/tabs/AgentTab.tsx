@@ -103,6 +103,131 @@ interface KiteAgentCapability {
   reason: string;
 }
 
+interface KiteAccountSummary {
+  loggedIn: boolean;
+  email: string | null;
+  userId: string | null;
+  signupEmail: string | null;
+  pendingSignupId: string | null;
+  pendingLoginId: string | null;
+  currentAgentIdentity: string | null;
+  authState: string;
+}
+
+interface KiteWalletAsset {
+  symbol: string;
+  balance: string;
+  native: boolean;
+}
+
+interface KiteWalletSummary {
+  walletAddress: string;
+  walletType: string;
+  chainId: number;
+  assets: KiteWalletAsset[];
+  canUseFaucet: boolean;
+}
+
+interface KiteSessionSummary {
+  id: string;
+  status: string;
+  agentType: string;
+  expiresAt: string | null;
+  taskSummary: string | null;
+  assets: string[];
+  maxAmountPerTx: string | null;
+  maxTotalAmount: string | null;
+  spentTotal: string | null;
+  reservedTotal: string | null;
+  selected: boolean;
+}
+
+interface KiteActivityEvent {
+  id: string;
+  kind: string;
+  status: string;
+  title: string;
+  occurredAt: string;
+  amountDisplay: string | null;
+  chainName: string | null;
+  txHash: string | null;
+  orderId: string | null;
+  itemTitles: string[];
+  errorMessage: string | null;
+}
+
+interface KiteShopItem {
+  provider: string;
+  externalIdentifier: string;
+  title: string;
+  price: string;
+  rating: string | null;
+  reviews: string | null;
+  link: string | null;
+  thumbnail: string | null;
+}
+
+interface KiteCartItem {
+  provider: string;
+  externalIdentifier: string;
+  productLocator: string;
+  title: string;
+  price: string;
+  quantity: number;
+}
+
+interface KiteShippingSummary {
+  name: string | null;
+  email: string | null;
+  line1: string | null;
+  line2: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  country: string | null;
+  complete: boolean;
+  missing: string[];
+}
+
+interface KiteCartSummary {
+  items: KiteCartItem[];
+  itemCount: number;
+  paymentCurrency: string | null;
+  paymentChain: string | null;
+  shipping: KiteShippingSummary | null;
+}
+
+interface KiteOrderSummary {
+  orderId: string;
+  phase: string | null;
+  paymentStatus: string | null;
+  txHash: string | null;
+  currency: string | null;
+  chain: string | null;
+  deliveryStatus: string | null;
+  title: string | null;
+}
+
+interface KiteDeveloperSummary {
+  authState: string;
+  connected: boolean;
+  maskedMcpUrl: string | null;
+  lastPayerAddr: string | null;
+  currentSessionId: string | null;
+}
+
+interface KiteHubState {
+  setup: KiteSetupStatus;
+  account: KiteAccountSummary;
+  wallet: KiteWalletSummary | null;
+  sessions: KiteSessionSummary[];
+  activity: KiteActivityEvent[];
+  cart: KiteCartSummary | null;
+  orders: KiteOrderSummary[];
+  developer: KiteDeveloperSummary;
+  issues: string[];
+}
+
 function describeKiteAuthState(state: string): string {
   switch (state) {
     case 'ready':
@@ -151,6 +276,13 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
   const [kiteStatus, setKiteStatus] = useState<KiteSetupStatus | null>(null);
   const [kiteCapability, setKiteCapability] =
     useState<KiteAgentCapability | null>(null);
+  const [kiteHub, setKiteHub] = useState<KiteHubState | null>(null);
+  const [kiteSendTo, setKiteSendTo] = useState('');
+  const [kiteSendAmount, setKiteSendAmount] = useState('');
+  const [kiteSendAsset, setKiteSendAsset] = useState('USDC');
+  const [kiteFaucetToken] = useState('USDC');
+  const [kiteShopQuery, setKiteShopQuery] = useState('');
+  const [kiteShopResults, setKiteShopResults] = useState<KiteShopItem[]>([]);
   const [kiteMessage, setKiteMessage] = useState<string | null>(null);
   const [kiteLoading, setKiteLoading] = useState(false);
 
@@ -180,30 +312,29 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
     void loadKeys();
   }, [config.agent.provider]);
 
+  async function refreshKiteHubState() {
+    try {
+      const [settings, status, hub, capability] = await Promise.all([
+        invoke<Record<string, string>>('get_settings'),
+        invoke<KiteSetupStatus>('get_kite_setup_status'),
+        invoke<KiteHubState>('get_kite_hub_state'),
+        invoke<KiteAgentCapability>('get_kite_agent_capability'),
+      ]);
+      setKiteMcpUrl(settings['kite_mcp_url'] ?? '');
+      setKiteSignupEmail(settings['kite_signup_email'] ?? status.signupEmail ?? '');
+      setKiteStatus(status);
+      setKiteHub(hub);
+      setKiteCapability(capability);
+    } catch {
+      setKiteStatus(null);
+      setKiteHub(null);
+      setKiteCapability(null);
+    }
+  }
+
   useEffect(() => {
     async function loadKiteState() {
-      try {
-        const [settings, status] = await Promise.all([
-          invoke<Record<string, string>>('get_settings'),
-          invoke<KiteSetupStatus>('get_kite_setup_status'),
-        ]);
-        setKiteMcpUrl(settings['kite_mcp_url'] ?? '');
-        setKiteSignupEmail(
-          settings['kite_signup_email'] ?? status.signupEmail ?? '',
-        );
-        setKiteStatus(status);
-        try {
-          const capability = await invoke<KiteAgentCapability>(
-            'get_kite_agent_capability',
-          );
-          setKiteCapability(capability);
-        } catch {
-          setKiteCapability(null);
-        }
-      } catch {
-        setKiteStatus(null);
-        setKiteCapability(null);
-      }
+      await refreshKiteHubState();
     }
 
     void loadKiteState();
@@ -400,6 +531,143 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
             : '/kite setup',
       });
       setKiteMessage(message);
+    } catch (error) {
+      setKiteMessage(String(error));
+    } finally {
+      setKiteLoading(false);
+    }
+  }
+
+  async function logoutKiteAccount() {
+    setKiteLoading(true);
+    setKiteMessage(null);
+    try {
+      const account = await invoke<KiteAccountSummary>('kite_logout');
+      await refreshKiteHubState();
+      setKiteMessage(
+        account.loggedIn
+          ? `Still logged in as ${account.email ?? 'unknown user'}.`
+          : 'Kite Passport logged out on this device.',
+      );
+    } catch (error) {
+      setKiteMessage(String(error));
+    } finally {
+      setKiteLoading(false);
+    }
+  }
+
+  async function sendKiteWalletTransfer() {
+    setKiteLoading(true);
+    setKiteMessage(null);
+    try {
+      const transfer = await invoke<{
+        amount: string;
+        asset: string;
+        recipientAddress: string;
+        transactionHash: string;
+      }>('kite_wallet_send', {
+        to: kiteSendTo.trim(),
+        amount: kiteSendAmount.trim(),
+        asset: kiteSendAsset.trim(),
+      });
+      await refreshKiteHubState();
+      setKiteMessage(
+        `Sent ${transfer.amount} ${transfer.asset} to ${transfer.recipientAddress}. Tx: ${transfer.transactionHash}`,
+      );
+      setKiteSendTo('');
+      setKiteSendAmount('');
+    } catch (error) {
+      setKiteMessage(String(error));
+    } finally {
+      setKiteLoading(false);
+    }
+  }
+
+  async function requestKiteFaucet() {
+    setKiteLoading(true);
+    setKiteMessage(null);
+    try {
+      const drop = await invoke<{
+        amount: string;
+        asset: string;
+        transactionHash: string;
+      }>('kite_faucet_drop', {
+        token: kiteFaucetToken.trim(),
+      });
+      await refreshKiteHubState();
+      setKiteMessage(
+        `Dropped ${drop.amount} ${drop.asset} to your testnet wallet. Tx: ${drop.transactionHash}`,
+      );
+    } catch (error) {
+      setKiteMessage(String(error));
+    } finally {
+      setKiteLoading(false);
+    }
+  }
+
+  async function selectKiteSession(sessionId: string) {
+    setKiteLoading(true);
+    setKiteMessage(null);
+    try {
+      await invoke('kite_use_session', { sessionId });
+      await refreshKiteHubState();
+      setKiteMessage(`Kite session ${sessionId} is now selected for Thikra.`);
+    } catch (error) {
+      setKiteMessage(String(error));
+    } finally {
+      setKiteLoading(false);
+    }
+  }
+
+  async function searchKiteShop() {
+    setKiteLoading(true);
+    setKiteMessage(null);
+    try {
+      const results = await invoke<KiteShopItem[]>('kite_shop_search', {
+        query: kiteShopQuery.trim(),
+      });
+      setKiteShopResults(results);
+      setKiteMessage(
+        results.length > 0
+          ? `Found ${results.length} Kite shopping result(s).`
+          : 'No Kite shopping results matched that query.',
+      );
+    } catch (error) {
+      setKiteShopResults([]);
+      setKiteMessage(String(error));
+    } finally {
+      setKiteLoading(false);
+    }
+  }
+
+  async function addKiteCartItem(item: KiteShopItem) {
+    setKiteLoading(true);
+    setKiteMessage(null);
+    try {
+      await invoke('kite_cart_add', {
+        provider: item.provider,
+        externalId: item.externalIdentifier,
+        quantity: 1,
+      });
+      await refreshKiteHubState();
+      setKiteMessage(`Added ${item.title} to your Kite cart.`);
+    } catch (error) {
+      setKiteMessage(String(error));
+    } finally {
+      setKiteLoading(false);
+    }
+  }
+
+  async function removeKiteCartItem(item: KiteCartItem) {
+    setKiteLoading(true);
+    setKiteMessage(null);
+    try {
+      await invoke('kite_cart_remove', {
+        provider: item.provider,
+        externalId: item.externalIdentifier,
+      });
+      await refreshKiteHubState();
+      setKiteMessage(`Removed ${item.title} from your Kite cart.`);
     } catch (error) {
       setKiteMessage(String(error));
     } finally {
@@ -629,7 +897,7 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
                 Thikra can install Kite Passport CLI and start Passport sign-up
                 with your email. Wallet creation and agent provisioning still
                 happen in the Kite Portal during the current invite-only
-                testnet. Thuki stores the raw MCP URL locally and uses it to
+                testnet. Thikra stores the raw MCP URL locally and uses it to
                 run `/kite` commands.
               </p>
 
@@ -828,6 +1096,13 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
 
               <div className="flex flex-col gap-1 text-xs">
                 <span style={{ color: 'var(--color-text-secondary)' }}>
+                  Hub:{' '}
+                  <span style={{ color: 'var(--color-text-primary)' }}>
+                    Native account, wallet, sessions, activity, and shopping
+                    surfaces are now mapped directly to Kite Passport.
+                  </span>
+                </span>
+                <span style={{ color: 'var(--color-text-secondary)' }}>
                   CLI:{' '}
                   <span style={{ color: 'var(--color-text-primary)' }}>
                     {kiteStatus?.cliInstalled
@@ -897,15 +1172,429 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
                     installer path.
                   </span>
                 </span>
-                {kiteCapability?.reason ? (
-                  <span style={{ color: 'var(--color-text-secondary)' }}>
-                    AI detail:{' '}
-                    <span style={{ color: 'var(--color-text-primary)' }}>
-                      {kiteCapability.reason}
-                    </span>
-                  </span>
-                ) : null}
               </div>
+
+              {kiteHub ? (
+                <div className="flex flex-col gap-3">
+                  <div
+                    className="rounded-xl border p-3"
+                    style={{
+                      borderColor: 'rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.04)',
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                        Account
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void logoutKiteAccount()}
+                        disabled={kiteLoading || !kiteHub.account.loggedIn}
+                        className="text-xs"
+                        style={{
+                          color: 'var(--color-text-secondary)',
+                          background: 'none',
+                          border: 'none',
+                          cursor:
+                            kiteLoading || !kiteHub.account.loggedIn
+                              ? 'not-allowed'
+                              : 'pointer',
+                          opacity:
+                            kiteLoading || !kiteHub.account.loggedIn ? 0.5 : 1,
+                          padding: 0,
+                        }}
+                      >
+                        Logout
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-col gap-1 text-xs">
+                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                        Status:{' '}
+                        <span style={{ color: 'var(--color-text-primary)' }}>
+                          {kiteHub.account.loggedIn ? 'Logged in' : 'Awaiting login'}
+                        </span>
+                      </span>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                        Email:{' '}
+                        <span style={{ color: 'var(--color-text-primary)' }}>
+                          {kiteHub.account.email ?? kiteHub.account.signupEmail ?? 'Not set'}
+                        </span>
+                      </span>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                        User ID:{' '}
+                        <span style={{ color: 'var(--color-text-primary)' }}>
+                          {kiteHub.account.userId ?? 'Unknown'}
+                        </span>
+                      </span>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                        Agent:{' '}
+                        <span style={{ color: 'var(--color-text-primary)' }}>
+                          {kiteHub.account.currentAgentIdentity ?? 'Not registered'}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    className="rounded-xl border p-3"
+                    style={{
+                      borderColor: 'rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.04)',
+                    }}
+                  >
+                    <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                      Wallet
+                    </span>
+                    <div className="mt-2 flex flex-col gap-1 text-xs">
+                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                        Address:{' '}
+                        <span style={{ color: 'var(--color-text-primary)' }}>
+                          {kiteHub.wallet?.walletAddress ?? 'Unavailable'}
+                        </span>
+                      </span>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                        Chain:{' '}
+                        <span style={{ color: 'var(--color-text-primary)' }}>
+                          {kiteHub.wallet?.chainId ?? 'Unknown'}
+                        </span>
+                      </span>
+                      {kiteHub.wallet?.assets.map((asset) => (
+                        <span key={asset.symbol} style={{ color: 'var(--color-text-secondary)' }}>
+                          {asset.symbol}:{' '}
+                          <span style={{ color: 'var(--color-text-primary)' }}>
+                            {asset.balance}
+                            {asset.native ? ' (native)' : ''}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <input
+                        type="text"
+                        value={kiteSendTo}
+                        onChange={(e) => setKiteSendTo(e.target.value)}
+                        placeholder="0x recipient"
+                        className="w-full bg-transparent border-b border-white/20 text-sm focus:outline-none focus:border-primary"
+                        style={{ color: 'var(--color-text-primary)', padding: '4px 0' }}
+                      />
+                      <input
+                        type="text"
+                        value={kiteSendAmount}
+                        onChange={(e) => setKiteSendAmount(e.target.value)}
+                        placeholder="Amount"
+                        className="w-full bg-transparent border-b border-white/20 text-sm focus:outline-none focus:border-primary"
+                        style={{ color: 'var(--color-text-primary)', padding: '4px 0' }}
+                      />
+                      <input
+                        type="text"
+                        value={kiteSendAsset}
+                        onChange={(e) => setKiteSendAsset(e.target.value)}
+                        placeholder="Asset"
+                        className="w-full bg-transparent border-b border-white/20 text-sm focus:outline-none focus:border-primary"
+                        style={{ color: 'var(--color-text-primary)', padding: '4px 0' }}
+                      />
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void sendKiteWalletTransfer()}
+                        disabled={
+                          kiteLoading ||
+                          kiteSendTo.trim().length === 0 ||
+                          kiteSendAmount.trim().length === 0 ||
+                          kiteSendAsset.trim().length === 0
+                        }
+                        className="text-xs font-medium rounded-lg px-3 py-1.5 transition-opacity"
+                        style={{
+                          background: 'rgba(255,255,255,0.08)',
+                          color: 'var(--color-text-primary)',
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          cursor:
+                            kiteLoading ||
+                            kiteSendTo.trim().length === 0 ||
+                            kiteSendAmount.trim().length === 0 ||
+                            kiteSendAsset.trim().length === 0
+                              ? 'not-allowed'
+                              : 'pointer',
+                          opacity:
+                            kiteLoading ||
+                            kiteSendTo.trim().length === 0 ||
+                            kiteSendAmount.trim().length === 0 ||
+                            kiteSendAsset.trim().length === 0
+                              ? 0.5
+                              : 1,
+                        }}
+                      >
+                        Send token
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void requestKiteFaucet()}
+                        disabled={kiteLoading || !kiteHub.wallet?.canUseFaucet}
+                        className="text-xs font-medium rounded-lg px-3 py-1.5 transition-opacity"
+                        style={{
+                          background: 'rgba(120, 180, 255, 0.14)',
+                          color: 'var(--color-text-primary)',
+                          border: '1px solid rgba(120, 180, 255, 0.22)',
+                          cursor:
+                            kiteLoading || !kiteHub.wallet?.canUseFaucet
+                              ? 'not-allowed'
+                              : 'pointer',
+                          opacity: kiteLoading || !kiteHub.wallet?.canUseFaucet ? 0.5 : 1,
+                        }}
+                      >
+                        Faucet {kiteFaucetToken}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    className="rounded-xl border p-3"
+                    style={{
+                      borderColor: 'rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.04)',
+                    }}
+                  >
+                    <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                      Sessions
+                    </span>
+                    <div className="mt-2 flex flex-col gap-2">
+                      {kiteHub.sessions.length === 0 ? (
+                        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                          No sessions yet. Use `/kite session create ...` to request one.
+                        </span>
+                      ) : (
+                        kiteHub.sessions.map((session) => (
+                          <div
+                            key={session.id}
+                            className="rounded-lg border p-2"
+                            style={{ borderColor: 'rgba(255,255,255,0.08)' }}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                                {session.id}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => void selectKiteSession(session.id)}
+                                disabled={kiteLoading || session.selected}
+                                className="text-xs"
+                                style={{
+                                  color: session.selected
+                                    ? 'var(--color-text-secondary)'
+                                    : 'var(--color-text-primary)',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor:
+                                    kiteLoading || session.selected
+                                      ? 'not-allowed'
+                                      : 'pointer',
+                                  padding: 0,
+                                }}
+                              >
+                                {session.selected ? 'Selected' : 'Use session'}
+                              </button>
+                            </div>
+                            <div className="mt-1 flex flex-col gap-1 text-xs">
+                              <span style={{ color: 'var(--color-text-secondary)' }}>
+                                Status:{' '}
+                                <span style={{ color: 'var(--color-text-primary)' }}>
+                                  {session.status}
+                                </span>
+                              </span>
+                              {session.taskSummary ? (
+                                <span style={{ color: 'var(--color-text-secondary)' }}>
+                                  Task:{' '}
+                                  <span style={{ color: 'var(--color-text-primary)' }}>
+                                    {session.taskSummary}
+                                  </span>
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    className="rounded-xl border p-3"
+                    style={{
+                      borderColor: 'rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.04)',
+                    }}
+                  >
+                    <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                      Activity
+                    </span>
+                    <div className="mt-2 flex flex-col gap-2">
+                      {kiteHub.activity.length === 0 ? (
+                        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                          No activity yet.
+                        </span>
+                      ) : (
+                        kiteHub.activity.slice(0, 5).map((event) => (
+                          <div key={event.id} className="text-xs">
+                            <span style={{ color: 'var(--color-text-primary)' }}>
+                              {event.title}
+                            </span>
+                            <span style={{ color: 'var(--color-text-secondary)' }}>
+                              {' '}
+                              {event.amountDisplay ? `• ${event.amountDisplay}` : ''} • {event.occurredAt}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    className="rounded-xl border p-3"
+                    style={{
+                      borderColor: 'rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.04)',
+                    }}
+                  >
+                    <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                      Shopping
+                    </span>
+                    <div className="mt-2 flex flex-col gap-2">
+                      <input
+                        type="text"
+                        value={kiteShopQuery}
+                        onChange={(e) => setKiteShopQuery(e.target.value)}
+                        placeholder="Search products with Kite"
+                        className="w-full bg-transparent border-b border-white/20 text-sm focus:outline-none focus:border-primary"
+                        style={{ color: 'var(--color-text-primary)', padding: '4px 0' }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void searchKiteShop()}
+                          disabled={kiteLoading || kiteShopQuery.trim().length === 0}
+                          className="text-xs font-medium rounded-lg px-3 py-1.5 transition-opacity"
+                          style={{
+                            background: 'rgba(255,255,255,0.08)',
+                            color: 'var(--color-text-primary)',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            cursor:
+                              kiteLoading || kiteShopQuery.trim().length === 0
+                                ? 'not-allowed'
+                                : 'pointer',
+                            opacity:
+                              kiteLoading || kiteShopQuery.trim().length === 0 ? 0.5 : 1,
+                          }}
+                        >
+                          Search
+                        </button>
+                      </div>
+                      {kiteShopResults.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {kiteShopResults.slice(0, 4).map((item) => (
+                            <div
+                              key={`${item.provider}:${item.externalIdentifier}`}
+                              className="rounded-lg border p-2"
+                              style={{ borderColor: 'rgba(255,255,255,0.08)' }}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                                    {item.title}
+                                  </span>
+                                  <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                                    {item.price}
+                                    {item.rating ? ` • ${item.rating}★` : ''}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void addKiteCartItem(item)}
+                                  disabled={kiteLoading}
+                                  className="text-xs"
+                                  style={{
+                                    color: 'var(--color-text-primary)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: kiteLoading ? 'not-allowed' : 'pointer',
+                                    padding: 0,
+                                  }}
+                                >
+                                  Add to cart
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="flex flex-col gap-2">
+                        <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                          Cart
+                        </span>
+                        {kiteHub.cart?.items.length ? (
+                          kiteHub.cart.items.map((item) => (
+                            <div
+                              key={item.productLocator}
+                              className="flex items-center justify-between gap-2 text-xs"
+                            >
+                              <span style={{ color: 'var(--color-text-secondary)' }}>
+                                <span style={{ color: 'var(--color-text-primary)' }}>
+                                  {item.title}
+                                </span>{' '}
+                                • {item.price} ×{item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => void removeKiteCartItem(item)}
+                                disabled={kiteLoading}
+                                className="text-xs"
+                                style={{
+                                  color: 'var(--color-text-secondary)',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: kiteLoading ? 'not-allowed' : 'pointer',
+                                  padding: 0,
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                            Cart is empty.
+                          </span>
+                        )}
+                        {kiteHub.orders.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                              Recent orders
+                            </span>
+                            {kiteHub.orders.slice(0, 3).map((order) => (
+                              <span key={order.orderId} className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                                <span style={{ color: 'var(--color-text-primary)' }}>
+                                  {order.orderId}
+                                </span>{' '}
+                                • {order.phase ?? order.paymentStatus ?? 'pending'}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {kiteHub?.issues.length ? (
+                <div className="flex flex-col gap-1 text-xs">
+                  {kiteHub.issues.slice(0, 4).map((issue) => (
+                    <span key={issue} style={{ color: '#ffb366' }}>
+                      {issue}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
 
               {kiteMessage ? (
                 <p

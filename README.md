@@ -1,9 +1,11 @@
 # Thikra
 
-
+<p align="center">
+  <strong>The Windows AI copilot that turns Kite Passport into a native product experience.</strong>
+</p>
 
 <p align="center">
-  A floating AI copilot for Windows that can think, search, see your screen, operate your desktop, and now transact through Kite Passport.
+  Thikra lives above your workflow, understands context, operates your desktop, and lets you install, sign up for, connect, and use Kite Passport without bouncing across docs, scripts, and portals.
 </p>
 
 <p align="center">
@@ -11,216 +13,246 @@
   <img src="https://img.shields.io/badge/Tauri-v2-24C8DB?logo=tauri&logoColor=white" alt="Tauri v2" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19" />
   <img src="https://img.shields.io/badge/Rust-stable-CE422B?logo=rust&logoColor=white" alt="Rust" />
-  <img src="https://img.shields.io/badge/Kite-Passport%20Mode%201-0EA5E9" alt="Kite Passport Mode 1" />
-  <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0" />
+  <img src="https://img.shields.io/badge/Kite-Passport-native%20hub-0EA5E9" alt="Kite Passport native hub" />
+  <img src="https://img.shields.io/badge/x402-ready-111827" alt="x402 ready" />
 </p>
 
-## What is Thikra?
+## What Thikra is
 
-Thikra is a Windows desktop AI assistant designed to live above your workflow instead of pulling you out of it. You summon it from anywhere, ask a question, attach your screen, run an agentic search, delegate a desktop task, or trigger a paid x402 call through Kite without leaving the app you were already using.
+Thikra is a Windows desktop AI copilot designed for real work, not just chat. It opens instantly as an overlay, understands the screen and the current task, can search the web with citations, operate the desktop, and now gives Kite Passport a full native home inside the app.
 
-This project began as a Windows adaptation of Thuki and has been shaped into a more ambitious product direction for hackathon use: an always-available desktop companion that combines:
+This project's core idea is simple:
 
-- local-first AI
-- optional cloud models
-- desktop agent automation
-- live search with citations
-- screen-aware context
-- Kite Passport-powered payments and x402 actions
+**Kite should feel like a product, not a pile of setup steps.**
 
-For this submission, the hero story is simple: **Thikra turns Kite into something you can actually use from an AI desktop interface, not just a docs flow.**
+So instead of stopping at a docs link or a raw CLI wrapper, Thikra turns Kite into:
 
-## Why this matters
+- an in-app setup flow
+- a native account and wallet surface
+- session and spending controls
+- x402 paid API execution
+- shopping, cart, checkout, and order visibility
+- AI-guided recovery when setup gets messy
 
-Most AI assistants can talk.
+## Why this stands out
 
-Very few can:
+Most AI apps can answer questions. Some can automate a desktop. Very few can carry a user from:
 
-- live on your desktop
-- see what you are working on
-- recover from setup friction
-- navigate users through operational flows
-- and then complete paid API actions through an agent wallet
+1. install
+2. signup
+3. wallet/session readiness
+4. payment approval
+5. paid API execution
+6. shopping and order tracking
 
-Thikra is built around that full loop.
+all inside one interface.
 
-With `/kite`, the assistant is not only explaining how Kite works. It can help the user get connected, inspect state, retrieve a payer address, request payment approval, and complete x402-style paid requests from the same interface they use for everything else.
+That is what Thikra does with Kite Passport.
 
-## The experience
+## The Kite-native experience
 
-### 1. Instant overlay AI
+### Native Kite Hub
 
-Double-tap `Ctrl` to open Thikra from anywhere on Windows. It appears as a lightweight overlay so the user can ask without switching tabs or opening a browser chatbot.
+Thikra includes a dedicated Kite hub inside the app with product-style sections for:
 
-### 2. Context-aware help
+- **Account**: signup state, login state, pending signup code, logout, and current identity
+- **Wallet**: payer address, balances, faucet actions, and token send flows
+- **Sessions**: registered agent state, active sessions, budget status, approval state, and session selection
+- **Activity**: recent wallet, session, payment, and order events
+- **Shopping**: product search, cart contents, checkout readiness, orders, and delivery tracking
+- **Developer / Payments**: MCP connection health, payer state, approval state, and x402 request visibility
 
-Users can:
+This is not a raw config page. It is a proper operational surface for Kite inside a desktop AI app.
 
-- quote selected text
-- paste or attach images
-- use `/screen` to send a fresh screenshot
-- use `Ctrl+Space` to instantly explain highlighted text
+### End-to-end Passport onboarding
 
-### 3. Agentic work
+`/kite setup` is designed to carry a new user through the real journey:
 
-Users can type `/do` and let Thikra operate the desktop for multi-step tasks. This uses the app's existing desktop agent loop, with confirmations for sensitive actions.
+- install Kite Agent Passport on Windows
+- work around the current hosted installer issues with a native app-managed install path
+- bootstrap `kpass` skills
+- collect a signup email
+- start Kite signup from inside the app
+- resume with verification code entry
+- guide the user into the Kite Portal when needed
+- save and verify the MCP URL
 
-### 4. Agentic search
+The result is a setup flow that feels dramatically more approachable than "copy this script and hope it works."
 
-Users can type `/search` to run a local iterative search pipeline that fetches sources, reads pages, and returns grounded answers with citations.
+### Wallets, sessions, and activity
 
-### 5. Kite inside the same interface
+Once connected, Thikra exposes the useful Kite primitives people actually need:
 
-Users can type `/kite` and move into Passport and payment flows without leaving the product.
+- retrieve wallet balances
+- send tokens
+- request testnet faucet funds
+- inspect active and expired sessions
+- select a current spending session
+- review recent account activity
 
-## Kite integration
+These capabilities are available both from the hub and from chat.
 
-Thikra integrates Kite Passport in the currently supported Mode 1 shape: **MCP + OAuth + user-owned Passport**.
+### Paid APIs with x402
 
-This implementation is intentionally honest about the current platform model:
+Thikra can bridge from conversation to paid machine access:
 
-- users still create their Passport account in Kite's ecosystem
-- users still create their Kite agent in Kite's Portal
-- users still paste the MCP URL provided by Kite
-- Thikra handles the connection, status checks, payment flow, x402 retries, and setup guidance inside the app
+1. user asks to use a paid endpoint
+2. Thikra detects or receives the Kite intent
+3. the first request is made
+4. if the service returns `402 Payment Required`, Thikra negotiates the payment flow
+5. payer details are fetched from Kite
+6. the user explicitly confirms the payment
+7. Thikra retries with the signed payment payload
+8. the final service result comes back into chat
 
-### Supported `/kite` commands
+This makes x402 feel like a native assistant workflow instead of a separate developer ritual.
 
-- `/kite setup`
-- `/kite connect`
-- `/kite status`
-- `/kite payer`
-- `/kite approve --payee <addr> --amount <amount> --token <symbol> [--merchant <name>]`
-- `/kite call --url <https://...> [--method GET|POST] [--body <json>] [--merchant <name>]`
+### Shopping, cart, checkout, and orders
 
-### What `/kite setup` does
+The current build also maps Kite shopping capabilities into the interface:
 
-`/kite setup` is the onboarding entrypoint.
+- search products
+- inspect cart state
+- prepare checkout
+- view orders
+- track order and delivery status
 
-It can:
+That means Thikra is not only a "wallet demo." It is a real consumer-facing Kite experience.
 
-- check whether the Kite CLI is installed
-- guide the user to the official Kite install flow
-- open the Kite Portal or docs
-- explain the invite-only/testnet reality of Passport onboarding
-- tell the user exactly where to paste the MCP URL
-- verify the saved Kite connection from inside the app
+## Hybrid UX: chat plus product surface
 
-### What makes the integration special
+Thikra supports both explicit commands and smart routing.
 
-The interesting part is not just "we added a payment command."
+### Explicit `/kite` command family
 
-The interesting part is that Thikra treats Kite as part of an agent workflow:
+The app supports a broad Kite command family, including:
 
-- deterministic when standard Kite operations are enough
-- agentic when setup or connection hits friction
-- advisory when the current AI provider cannot safely drive screenshot-based automation
+- `/kite setup --email ...`
+- `/kite setup --code ...`
+- `/kite login --email ...`
+- `/kite login --code ...`
+- `/kite logout`
+- `/kite me`
+- `/kite wallet`
+- `/kite send --to ... --amount ... --asset ...`
+- `/kite faucet --token ...`
+- `/kite sessions`
+- `/kite session create ...`
+- `/kite session use --session-id ...`
+- `/kite session status ...`
+- `/kite activity`
+- `/kite shop search --query "..."`
+- `/kite cart`
+- `/kite checkout --confirmed yes`
+- `/kite orders`
+- `/kite call --url ...`
 
-That means `/kite` is not only a command router. It is an orchestration layer.
+### Hybrid auto-routing
 
-## Agentic `/kite` mode
+Users do not have to memorize commands for obvious transactional intents.
 
-- **Deterministic mode:** normal setup, status, payer, approval, and x402 execution
-- **Agentic desktop mode:** Thikra can escalate into its desktop agent when setup or recovery gets messy
-- **Advisory fallback mode:** if the connected provider cannot support screenshot-driven automation, Thikra falls back to guided troubleshooting instead of dead-ending
+Thikra can automatically route clear requests like:
 
-### What the agent can do
+- "what's my wallet balance?"
+- "send 5 USDC to 0x..."
+- "use this paid API"
+- "show my recent activity"
+- "what orders do I have?"
+- "buy me a USB-C cable"
 
-When Kite setup or recovery becomes messy, Thikra can help:
+into Kite-backed flows.
 
-- open the right Kite pages
-- drive the installer flow
-- diagnose missing CLI or missing MCP configuration
-- guide OAuth/session recovery
-- verify connection state
-- resume the requested Kite action once the blocking issue is resolved
+That makes the system feel native and conversational without hiding the explicit power-user path.
 
-### Safety boundaries
+## Agentic Kite recovery
 
-We were careful not to make "agentic" mean reckless.
+One of the most important parts of this project is that Kite is not treated like a happy-path-only integration.
 
-- New secrets and sensitive setup values are still entered manually by the user
-- Payment approvals require explicit confirmation
-- Paid x402 retries do not happen silently
-- The agent can use already-saved configuration, but it does not invent user credentials
+When setup or connection gets messy, Thikra can switch between three modes:
 
-This makes the system feel helpful without becoming unsafe.
+- **Deterministic mode** for normal operations
+- **Agentic mode** when an AI-capable provider can help navigate setup or recovery
+- **Guided mode** when full autopilot is unavailable but the user still needs actionable help
 
-## How Kite payments work in Thikra
+This matters because real users hit friction:
 
-The x402 flow is implemented as a real app path, not a fake prompt demo.
+- missing CLI
+- broken installer
+- no MCP URL yet
+- auth/session confusion
+- payment approval pauses
+- cloud vs local capability differences
 
-High-level flow:
+Thikra is built to keep the user moving instead of dead-ending at an error string.
 
-1. User runs `/kite call --url ...`
-2. Thikra makes the initial request
-3. If the service returns `402 Payment Required`, Thikra extracts the payment requirements
-4. Thikra fetches the payer address from Kite
-5. Thikra pauses for explicit user approval
-6. Thikra asks Kite to approve/sign the payment
-7. Thikra retries the service call with the payment payload
-8. The final response is returned in chat
+## Safety model
 
-This means the product can bridge from conversational intent to paid machine-to-machine access in one interface.
+We wanted this to feel powerful without becoming reckless.
+
+- payment approvals require explicit confirmation
+- new secrets and sensitive values stay manual-entry
+- MCP values are treated as sensitive
+- the assistant can use already-saved state, but it does not invent credentials
+- local and cloud AI modes are clearly separated
+
+The result is an agentic experience that still respects user control.
+
+## Everything else Thikra can do
+
+Kite is the hero, but Thikra is a full desktop copilot:
+
+- instant overlay summoned with a double-tap of `Ctrl`
+- `Ctrl+Space` quick explain for highlighted text
+- `/screen` for screen-aware help
+- `/search` for cited agentic web research
+- `/do` for desktop task execution
+- support for local models through Ollama
+- optional cloud providers like OpenRouter for stronger agentic behavior
+
+## Demo flow for judges
+
+If you want the cleanest high-signal demo, run this:
+
+1. Open Thikra from anywhere with `Ctrl`
+2. Ask a normal question to show the base assistant
+3. Use `/screen` to analyze the current app
+4. Use `/search` to fetch a cited result
+5. Run `/kite setup --email you@example.com`
+6. Show the native install, signup, and verification flow
+7. Open the Kite hub and show Account, Wallet, Sessions, Activity, and Shopping
+8. Ask "what's my wallet balance?" and show auto-routing into Kite
+9. Ask to use a paid API and show the x402 approval flow
+10. Ask to find or buy a product and show shopping/cart/orders
+
+That sequence shows a complete story:
+
+- assistant
+- agent
+- payments
+- commerce
+- real operational UX
 
 ## Architecture
 
-Thikra is a Tauri v2 desktop app with:
+Thikra is built as a Tauri v2 app with:
 
-- **Rust backend** for native commands, hotkeys, persistence, Kite integration, agent orchestration, and IPC
-- **React + TypeScript frontend** for the overlay UI, chat experience, settings, and streamed event rendering
+- **Rust backend** for native commands, Kite orchestration, hotkeys, setup logic, and IPC
+- **React + TypeScript frontend** for the overlay UI, native hub, chat rendering, and streamed flows
 - **SQLite** for local persistence
-- **Ollama** for local inference by default
-- **Optional cloud providers** for OpenRouter, Anthropic, or OpenAI
+- **Ollama** for local inference
+- **optional cloud providers** for stronger model and agent behavior
 
-### Important subsystems
+Important implementation areas:
 
 - `src/App.tsx`
-  Main UI orchestration and slash-command routing
 - `src/hooks/useOllama.ts`
-  Streamed backend communication for normal chat, search, and Kite flows
 - `src/hooks/useAgentMode.ts`
-  Desktop agent state and completion handling
-- `src-tauri/src/agent.rs`
-  The native desktop agent loop reused by `/do` and agentic `/kite`
+- `src/settings/tabs/AgentTab.tsx`
 - `src-tauri/src/kite.rs`
-  Kite Passport setup, status, approval, x402 orchestration, and agentic escalation
+- `src-tauri/src/agent.rs`
 - `src-tauri/src/lib.rs`
-  App bootstrapping, command registration, shared state, and Tauri setup
 
-## Privacy and trust model
-
-Thikra is designed to be practical about privacy.
-
-- Local mode works through Ollama on the user's machine
-- Conversation data stays local in SQLite
-- Cloud mode is optional
-- Screenshot-based agent behavior is gated by provider capability and consent
-- Kite setup values that may contain sensitive auth material are not treated like normal display config
-
-For Kite specifically:
-
-- the MCP URL is treated as sensitive
-- new sensitive values remain manual-entry steps
-- financial actions require confirmation
-
-## Demo script for judges
-
-If you want the fastest path to understanding the product, this is the ideal demo:
-
-1. Open Thikra with `Ctrl`
-2. Ask a normal AI question
-3. Use `/screen` to analyze the current app
-4. Use `/search` to fetch live cited information
-5. Use `/do` for a short desktop automation task
-6. Use `/kite setup` to show guided Kite onboarding
-7. Use `/kite status` to verify readiness
-8. Use `/kite payer` to retrieve the Passport payer address
-9. Use `/kite call --url ...` to demonstrate the x402 payment flow with confirmation
-
-That sequence shows that Thikra is not a single-feature hack. It is a cohesive AI operating layer with Kite embedded into it.
-
-## Getting started
+## Run locally
 
 ### Prerequisites
 
@@ -228,16 +260,15 @@ That sequence shows that Thikra is not a single-feature hack. It is a cohesive A
 - [Bun](https://bun.sh)
 - [Rust](https://rustup.rs)
 - [Ollama](https://ollama.com) for local inference
-- Optional: Docker Desktop for sandbox and local search services
 
-### Run from source
+### Start the app
 
 ```powershell
 bun install
 bun run dev
 ```
 
-### Frontend-only dev server
+### Frontend-only mode
 
 ```powershell
 bun run frontend:dev
@@ -245,58 +276,40 @@ bun run frontend:dev
 
 ### Local model setup
 
-Install Ollama, then pull a model:
-
 ```powershell
 ollama pull gemma4:e2b
 ```
 
-Thikra will connect to Ollama at `http://127.0.0.1:11434` by default.
-
-### Search sandbox
-
-`/search` depends on the local search stack described in [docs/agentic-search.md](docs/agentic-search.md).
-Use that guide to bring up the search services before demoing the search flow.
-
-### Kite setup
+### Kite flow
 
 Inside the desktop app:
 
-1. Open Thikra
-2. Run `/kite setup`
-3. Follow the guided setup flow
-4. Install Kite CLI if needed
-5. Open Kite Portal
-6. Create or access the Passport/agent in Kite's system
-7. Paste the MCP URL into Thikra Settings
-8. Verify the connection
+1. Run `/kite setup --email you@example.com`
+2. Follow the install and signup flow
+3. Enter the verification code when prompted
+4. Open the Kite Portal when needed
+5. Paste the MCP URL into the Kite section
+6. Verify the connection
+7. Use the hub or ask natural language requests like "what's my balance?" or "show my orders"
 
-After that, use `/kite status`, `/kite payer`, `/kite approve`, and `/kite call`.
+## Why this can win
 
-## Commands users will care about
+This submission does not treat Kite as a side quest.
 
-- `/screen` capture the current screen as context
-- `/do` run a desktop agent task
-- `/think` enable deeper reasoning
-- `/search` run agentic search with citations
-- `/kite` run Kite Passport and payment actions
-- `/translate`, `/rewrite`, `/tldr`, `/refine`, `/bullets`, `/todos` for fast utility workflows
+It treats Kite as a native product layer and solves the hardest part of these integrations: making them usable by real people inside a real interface.
 
-## Why we think this can win
+Thikra combines:
 
-Hackathon projects often do one of two things:
+- a polished desktop AI shell
+- native Passport onboarding
+- wallet and session visibility
+- x402 execution
+- shopping and order flows
+- hybrid chat plus dashboard UX
+- agentic recovery instead of brittle happy-path demos
 
-- they build a nice UI around a model
-- or they build a protocol integration with little product framing
+That combination is what makes it compelling.
 
-Thikra tries to do both well.
+## License
 
-It gives Kite a real user-facing home:
-
-- a desktop-native experience
-- a conversational interface
-- agentic recovery when flows fail
-- explicit safety controls for money and secrets
-- and a credible path from setup, to connection, to payment-backed API usage
-
-We think that combination is differentiated.
+Licensed under the [Apache License, Version 2.0](LICENSE).
