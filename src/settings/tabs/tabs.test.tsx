@@ -716,6 +716,7 @@ describe('AgentTab', () => {
       if (cmd === 'get_settings') {
         return {
           kite_mcp_url: 'https://neo.dev.gokite.ai/v1/mcp?token=secret',
+          kite_signup_email: 'and00sama@gmail.com',
         };
       }
       if (cmd === 'get_kite_setup_status') {
@@ -727,6 +728,8 @@ describe('AgentTab', () => {
           authState: 'ready',
           connected: true,
           lastPayerAddr: '0x123',
+          signupEmail: 'and00sama@gmail.com',
+          pendingSignupId: 'signup_123',
           inviteOnly: true,
           docsUrl: 'https://docs.gokite.ai/kite-agent-passport/developer-guide',
           portalUrl: 'https://x402-portal-eight.vercel.app/',
@@ -767,13 +770,27 @@ describe('AgentTab', () => {
     await renderAgent();
     expect(screen.getByText('Kite Passport')).toBeInTheDocument();
     expect(screen.getByDisplayValue('https://neo.dev.gokite.ai/v1/mcp?token=secret')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('and00sama@gmail.com')).toBeInTheDocument();
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByText('0x123')).toBeInTheDocument();
+    expect(screen.getByText('signup_123')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Use AI to finish setup' })).toBeInTheDocument();
+    expect(screen.getByText(/Autopilot available via openrouter/i)).toBeInTheDocument();
   });
 
   it('saves, verifies, and disconnects Kite settings through Tauri commands', async () => {
     await renderAgent();
+
+    fireEvent.change(screen.getByPlaceholderText('you@example.com'), {
+      target: { value: 'updated@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save email' }));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('set_setting', {
+        key: 'kite_signup_email',
+        value: 'updated@example.com',
+      }),
+    );
 
     fireEvent.change(screen.getByPlaceholderText('Paste the MCP URL from Kite Portal'), {
       target: { value: 'https://neo.dev.gokite.ai/v1/mcp?token=updated' },
@@ -803,6 +820,8 @@ describe('AgentTab', () => {
           authState: 'ready',
           connected: true,
           lastPayerAddr: '0x123',
+          signupEmail: 'and00sama@gmail.com',
+          pendingSignupId: null,
           inviteOnly: true,
           docsUrl: 'https://docs.gokite.ai/kite-agent-passport/developer-guide',
           portalUrl: 'https://x402-portal-eight.vercel.app/',
@@ -812,6 +831,7 @@ describe('AgentTab', () => {
       if (cmd === 'get_settings') {
         return {
           kite_mcp_url: 'https://neo.dev.gokite.ai/v1/mcp?token=updated',
+          kite_signup_email: 'and00sama@gmail.com',
         };
       }
       return CONFIG;
@@ -833,6 +853,7 @@ describe('AgentTab', () => {
       if (cmd === 'get_settings') {
         return {
           kite_mcp_url: '',
+          kite_signup_email: '',
         };
       }
       if (cmd === 'get_kite_setup_status') {
@@ -844,6 +865,8 @@ describe('AgentTab', () => {
           authState: 'cli_missing',
           connected: false,
           lastPayerAddr: null,
+          signupEmail: null,
+          pendingSignupId: null,
           inviteOnly: true,
           docsUrl: 'https://docs.gokite.ai/kite-agent-passport/developer-guide',
           portalUrl: 'https://x402-portal-eight.vercel.app/',
@@ -875,6 +898,7 @@ describe('AgentTab', () => {
     await waitFor(() =>
       expect(invokeMock).toHaveBeenCalledWith('install_kite_cli'),
     );
+    expect(screen.getByText(/installed from Thikra/i)).toBeInTheDocument();
   });
 
   it('starts AI-assisted Kite setup from Settings', async () => {
@@ -884,8 +908,58 @@ describe('AgentTab', () => {
 
     await waitFor(() =>
       expect(invokeMock).toHaveBeenCalledWith('start_kite_agent_mode', {
-        input: '/kite setup',
+        input: '/kite setup --email and00sama@gmail.com',
       }),
+    );
+  });
+
+  it('shows guided Kite help from Settings when autopilot is unavailable', async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_settings') {
+        return { kite_mcp_url: '', kite_signup_email: '' };
+      }
+      if (cmd === 'get_kite_setup_status') {
+        return {
+          cliInstalled: false,
+          cliPath: null,
+          mcpUrlConfigured: false,
+          maskedMcpUrl: null,
+          authState: 'cli_missing',
+          connected: false,
+          lastPayerAddr: null,
+          signupEmail: null,
+          pendingSignupId: null,
+          inviteOnly: true,
+          docsUrl: 'https://docs.gokite.ai/kite-agent-passport/developer-guide',
+          portalUrl: 'https://x402-portal-eight.vercel.app/',
+          installerUrl: 'https://cli.gokite.ai/install.sh',
+        };
+      }
+      if (cmd === 'get_kite_agent_capability') {
+        return {
+          available: false,
+          mode: 'advisory_fallback',
+          provider: 'ollama',
+          model: null,
+          reason: 'Ollama is unreachable.',
+        };
+      }
+      if (cmd === 'start_kite_agent_mode') {
+        return 'Kite guided help\nOllama is unreachable.';
+      }
+      return CONFIG;
+    });
+
+    render(<AgentTab config={CONFIG} resyncToken={0} onSaved={() => {}} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use AI to finish setup' }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Kite guided help/i)).toBeInTheDocument(),
     );
   });
 });

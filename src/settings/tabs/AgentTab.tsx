@@ -80,6 +80,8 @@ interface KiteSetupStatus {
   authState: string;
   connected: boolean;
   lastPayerAddr: string | null;
+  signupEmail: string | null;
+  pendingSignupId: string | null;
   inviteOnly: boolean;
   docsUrl: string;
   portalUrl: string;
@@ -145,6 +147,7 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
   );
   const [orModel, setOrModel] = useState(OPENROUTER_DEFAULT_MODEL);
   const [kiteMcpUrl, setKiteMcpUrl] = useState('');
+  const [kiteSignupEmail, setKiteSignupEmail] = useState('');
   const [kiteStatus, setKiteStatus] = useState<KiteSetupStatus | null>(null);
   const [kiteCapability, setKiteCapability] =
     useState<KiteAgentCapability | null>(null);
@@ -185,6 +188,9 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
           invoke<KiteSetupStatus>('get_kite_setup_status'),
         ]);
         setKiteMcpUrl(settings['kite_mcp_url'] ?? '');
+        setKiteSignupEmail(
+          settings['kite_signup_email'] ?? status.signupEmail ?? '',
+        );
         setKiteStatus(status);
         try {
           const capability = await invoke<KiteAgentCapability>(
@@ -290,6 +296,26 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
     }
   }
 
+  async function saveKiteSignupEmail() {
+    setKiteLoading(true);
+    setKiteMessage(null);
+    try {
+      await invoke('set_setting', {
+        key: 'kite_signup_email',
+        value: kiteSignupEmail.trim(),
+      });
+      const status = await invoke<KiteSetupStatus>('get_kite_setup_status');
+      setKiteStatus(status);
+      setKiteMessage(
+        'Kite signup email saved. `/kite setup` can now start the Passport sign-up flow.',
+      );
+    } catch (error) {
+      setKiteMessage(String(error));
+    } finally {
+      setKiteLoading(false);
+    }
+  }
+
   async function verifyKite() {
     setKiteLoading(true);
     setKiteMessage(null);
@@ -346,7 +372,9 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
       const cliPath = await invoke<string>('install_kite_cli');
       const status = await invoke<KiteSetupStatus>('get_kite_setup_status');
       setKiteStatus(status);
-      setKiteMessage(`Kite CLI installed successfully at ${cliPath}.`);
+      setKiteMessage(
+        `Kite CLI installed from Thikra at ${cliPath}. If Kite's hosted PowerShell bootstrap is broken, this native Windows installer path keeps setup moving.`,
+      );
     } catch (error) {
       setKiteMessage(String(error));
     } finally {
@@ -358,8 +386,18 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
     setKiteLoading(true);
     setKiteMessage(null);
     try {
+      const trimmedEmail = kiteSignupEmail.trim();
+      if (trimmedEmail.length > 0) {
+        await invoke('set_setting', {
+          key: 'kite_signup_email',
+          value: trimmedEmail,
+        });
+      }
       const message = await invoke<string>('start_kite_agent_mode', {
-        input: '/kite setup',
+        input:
+          trimmedEmail.length > 0
+            ? `/kite setup --email ${trimmedEmail}`
+            : '/kite setup',
       });
       setKiteMessage(message);
     } catch (error) {
@@ -588,11 +626,39 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
                 className="text-xs"
                 style={{ color: 'var(--color-text-secondary)', lineHeight: 1.5 }}
               >
-                Mode 1 only. Kite Passport signup, wallet creation, and agent
-                provisioning still happen in the Kite Portal during the current
-                invite-only testnet. Thuki stores the raw MCP URL locally and
-                uses it to run `/kite` commands.
+                Thikra can install Kite Passport CLI and start Passport sign-up
+                with your email. Wallet creation and agent provisioning still
+                happen in the Kite Portal during the current invite-only
+                testnet. Thuki stores the raw MCP URL locally and uses it to
+                run `/kite` commands.
               </p>
+
+              <div className="flex flex-col gap-1">
+                <label
+                  className="text-xs font-medium"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  Signup email
+                </label>
+                <input
+                  type="email"
+                  value={kiteSignupEmail}
+                  onChange={(e) => setKiteSignupEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full bg-transparent border-b border-white/20 text-sm focus:outline-none focus:border-primary"
+                  style={{
+                    color: 'var(--color-text-primary)',
+                    padding: '4px 0',
+                  }}
+                />
+                <span
+                  className="text-xs"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  `/kite setup` uses this email to start Kite Passport signup,
+                  then pauses for the 8-character code from your inbox.
+                </span>
+              </div>
 
               <div className="flex flex-col gap-1">
                 <label
@@ -622,6 +688,27 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void saveKiteSignupEmail()}
+                  disabled={kiteLoading || kiteSignupEmail.trim().length === 0}
+                  className="text-xs font-medium rounded-lg px-3 py-1.5 transition-opacity"
+                  style={{
+                    background: 'rgba(255,255,255,0.08)',
+                    color: 'var(--color-text-primary)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    cursor:
+                      kiteLoading || kiteSignupEmail.trim().length === 0
+                        ? 'not-allowed'
+                        : 'pointer',
+                    opacity:
+                      kiteLoading || kiteSignupEmail.trim().length === 0
+                        ? 0.5
+                        : 1,
+                  }}
+                >
+                  Save email
+                </button>
                 <button
                   type="button"
                   onClick={() => void saveKiteMcpUrl()}
@@ -755,15 +842,21 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
                   </span>
                 </span>
                 <span style={{ color: 'var(--color-text-secondary)' }}>
-                  AI assist:{' '}
+                  AI mode:{' '}
                   <span style={{ color: 'var(--color-text-primary)' }}>
                     {kiteCapability?.available
-                      ? `${kiteCapability.provider}${
+                      ? `Autopilot available via ${kiteCapability.provider}${
                           kiteCapability.model
                             ? ` (${kiteCapability.model})`
                             : ''
                         }`
-                      : 'Advisory fallback only'}
+                      : 'Guided help only'}
+                  </span>
+                </span>
+                <span style={{ color: 'var(--color-text-secondary)' }}>
+                  AI detail:{' '}
+                  <span style={{ color: 'var(--color-text-primary)' }}>
+                    {kiteCapability?.reason ?? 'Checking Kite AI capability…'}
                   </span>
                 </span>
                 <span style={{ color: 'var(--color-text-secondary)' }}>
@@ -785,10 +878,23 @@ export function AgentTab({ config, resyncToken, onSaved }: AgentTabProps) {
                   </span>
                 </span>
                 <span style={{ color: 'var(--color-text-secondary)' }}>
+                  Signup email:{' '}
+                  <span style={{ color: 'var(--color-text-primary)' }}>
+                    {(kiteStatus?.signupEmail ?? kiteSignupEmail) || 'Not set'}
+                  </span>
+                </span>
+                <span style={{ color: 'var(--color-text-secondary)' }}>
+                  Pending signup:{' '}
+                  <span style={{ color: 'var(--color-text-primary)' }}>
+                    {kiteStatus?.pendingSignupId ?? 'None'}
+                  </span>
+                </span>
+                <span style={{ color: 'var(--color-text-secondary)' }}>
                   Windows note:{' '}
                   <span style={{ color: 'var(--color-text-primary)' }}>
-                    Thuki can now run the official Kite PowerShell installer for
-                    you when the CLI is missing.
+                    Install Kite CLI from Thikra. If Kite&apos;s official
+                    PowerShell bootstrap is broken, Thikra uses its own Windows
+                    installer path.
                   </span>
                 </span>
                 {kiteCapability?.reason ? (

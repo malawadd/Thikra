@@ -34,6 +34,8 @@ const KITE_MCP_URL_KEY: &str = "kite_mcp_url";
 const KITE_SESSION_ID_KEY: &str = "kite_mcp_session_id";
 const KITE_AUTH_STATE_KEY: &str = "kite_auth_state";
 const KITE_LAST_PAYER_KEY: &str = "kite_last_payer_addr";
+const KITE_SIGNUP_EMAIL_KEY: &str = "kite_signup_email";
+const KITE_PENDING_SIGNUP_ID_KEY: &str = "kite_pending_signup_id";
 
 const KITE_CLI_BASE_URL: &str = "https://cli.gokite.ai";
 const KITE_DOCS_URL: &str = "https://docs.gokite.ai/kite-agent-passport/developer-guide";
@@ -108,6 +110,8 @@ pub struct KiteSetupStatus {
     pub auth_state: KiteAuthState,
     pub connected: bool,
     pub last_payer_addr: Option<String>,
+    pub signup_email: Option<String>,
+    pub pending_signup_id: Option<String>,
     pub invite_only: bool,
     pub docs_url: String,
     pub portal_url: String,
@@ -152,6 +156,7 @@ impl KiteRuntimeState {
 pub enum KiteEvent {
     CheckingCli,
     InstallingCli,
+    InstallingAgentPassport,
     OpeningPortal { target: String },
     WaitingForMcpConfig,
     VerifyingConnection,
@@ -171,7 +176,10 @@ pub enum KiteEvent {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum KiteCommand {
     Help,
-    Setup,
+    Setup {
+        email: Option<String>,
+        code: Option<String>,
+    },
     Connect,
     Status,
     Payer,
@@ -317,6 +325,51 @@ struct KiteArchiveBundle {
     checksum: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct KiteCliInstallOutcome {
+    cli_path: PathBuf,
+    path_updated: bool,
+    skills_bootstrapped: bool,
+    notes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct KiteSetupRequest {
+    email: Option<String>,
+    code: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+struct KpassEnvelope {
+    status: String,
+    #[serde(default)]
+    hint: String,
+    #[serde(default)]
+    error: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+struct KpassMeResponse {
+    user_id: String,
+    email: String,
+    status: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+struct KpassSignupInitResponse {
+    signup_id: String,
+    status: String,
+    #[serde(default)]
+    hint: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+struct KpassSignupExchangeResponse {
+    user_id: String,
+    email: String,
+    status: String,
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 #[cfg_attr(not(coverage), tauri::command)]
 pub fn get_kite_setup_status(
@@ -355,7 +408,7 @@ pub fn disconnect_kite(db: State<'_, crate::history::Database>) -> Result<(), St
 pub async fn install_kite_cli() -> Result<String, String> {
     install_kite_cli_inner_async()
         .await
-        .map(|path| path.display().to_string())
+        .map(|outcome| outcome.cli_path.display().to_string())
         .map_err(|e| e.message().to_string())
 }
 
@@ -508,8 +561,8 @@ async fn run_kite_command_inner(
             emit(KiteEvent::Token(kite_help_text()));
             Ok(())
         }
-        KiteCommand::Setup => {
-            let status = match handle_kite_setup(db, emit).await {
+        KiteCommand::Setup { email, code } => {
+            let status = match handle_kite_setup(db, KiteSetupRequest { email, code }, emit).await {
                 Ok(status) => status,
                 Err(err) if should_escalate_to_agent(&err) => {
                     maybe_escalate_kite_mode(
@@ -730,27 +783,131 @@ async fn run_kite_command_inner(
 
 async fn handle_kite_setup(
     db: &crate::history::Database,
+    request: KiteSetupRequest,
     emit: &mut impl FnMut(KiteEvent),
 ) -> Result<KiteSetupStatus, KiteError> {
     emit(KiteEvent::CheckingCli);
     let mut installed_now = false;
+    let mut install_outcome: Option<KiteCliInstallOutcome> = None;
     let cli = match detect_kite_cli() {
         Some(path) => Some(path),
         None => {
             emit(KiteEvent::InstallingCli);
-            let path = install_kite_cli_inner_async().await?;
+            emit(KiteEvent::InstallingAgentPassport);
+            let outcome = install_kite_cli_inner_async().await?;
             installed_now = true;
+            let path = outcome.cli_path.clone();
+            install_outcome = Some(outcome);
             Some(path)
         }
     };
+    if !installed_now {
+        if let Some(cli_path) = cli.as_ref() {
+            let codex_skill_missing =
+                kite_codex_skill_marker_path().is_some_and(|path| !path.exists());
+            if codex_skill_missing {
+                emit(KiteEvent::InstallingAgentPassport);
+                let bootstrap = ensure_kite_agent_passport_bootstrap(cli_path)?;
+                if bootstrap.path_updated
+                    || bootstrap.skills_bootstrapped
+                    || !bootstrap.notes.is_empty()
+                {
+                    install_outcome = Some(bootstrap);
+                }
+            }
+        }
+    }
+    let cli_path = cli.ok_or_else(|| {
+        KiteError::CliInstallFailed(
+            "Thikra could not find Kite CLI after installation. Retry from Settings > Agent > Kite Passport.".to_string(),
+        )
+    })?;
+    let current_user = load_current_kite_user(&cli_path)?;
+    let saved_state = {
+        let conn =
+            db.0.lock()
+                .map_err(|e: std::sync::PoisonError<_>| KiteError::Unknown(e.to_string()))?;
+        (
+            load_optional_setting(&conn, KITE_SIGNUP_EMAIL_KEY),
+            load_optional_setting(&conn, KITE_PENDING_SIGNUP_ID_KEY),
+        )
+    };
+    let resolved_email = match request.email {
+        Some(email) => Some(validate_signup_email(&email)?),
+        None => saved_state.0.clone(),
+    };
+    let resolved_code = request
+        .code
+        .as_deref()
+        .map(validate_signup_code)
+        .transpose()?;
+
+    let mut signup_summary: Option<String> = None;
+    if current_user.is_none() {
+        if let Some(code) = resolved_code.as_deref() {
+            let signup_id = saved_state.1.clone().ok_or_else(|| {
+                KiteError::BadInput(
+                    "No pending Kite sign-up was found. Start with `/kite setup --email you@example.com` first.".to_string(),
+                )
+            })?;
+            let exchange = complete_kite_signup(&cli_path, &signup_id, code)?;
+            store_string_setting(db, KITE_SIGNUP_EMAIL_KEY, &exchange.email)?;
+            store_string_setting(db, KITE_PENDING_SIGNUP_ID_KEY, "")?;
+            signup_summary = Some(describe_signup_success(&exchange));
+        } else if let Some(email) = resolved_email.as_deref() {
+            store_string_setting(db, KITE_SIGNUP_EMAIL_KEY, email)?;
+            let should_restart_signup =
+                saved_state.1.is_none() || saved_state.0.as_deref() != Some(email);
+            if should_restart_signup {
+                let signup = start_kite_signup(&cli_path, email)?;
+                store_string_setting(db, KITE_PENDING_SIGNUP_ID_KEY, &signup.signup_id)?;
+            }
+            emit(KiteEvent::AwaitingSensitiveValue {
+                field: "kite_signup_code".to_string(),
+                instructions: describe_signup_waiting_message(email),
+            });
+            let status = {
+                let conn = db
+                    .0
+                    .lock()
+                    .map_err(|e: std::sync::PoisonError<_>| KiteError::Unknown(e.to_string()))?;
+                load_setup_status(&conn, Some(cli_path))
+            };
+            return Ok(status);
+        } else {
+            emit(KiteEvent::AwaitingSensitiveValue {
+                field: "kite_signup_email".to_string(),
+                instructions: "Add your Kite Passport email in Settings > Agent > Kite Passport, or run `/kite setup --email you@example.com` to start sign-up.".to_string(),
+            });
+            let status = {
+                let conn = db
+                    .0
+                    .lock()
+                    .map_err(|e: std::sync::PoisonError<_>| KiteError::Unknown(e.to_string()))?;
+                load_setup_status(&conn, Some(cli_path))
+            };
+            return Ok(status);
+        }
+    }
+
     let conn =
         db.0.lock()
             .map_err(|e: std::sync::PoisonError<_>| KiteError::Unknown(e.to_string()))?;
-    let status = load_setup_status(&conn, cli);
+    let status = load_setup_status(&conn, Some(cli_path));
     let cli_line = match (status.cli_installed, status.cli_path.as_deref()) {
         (true, Some(path)) => format!("Kite CLI detected at `{path}`."),
         (true, None) => "Kite CLI is installed.".to_string(),
         (false, _) => "Thikra could not find Kite CLI after installation. Retry from Settings > Agent > Kite Passport.".to_string(),
+    };
+    let signup_line = if let Some(summary) = signup_summary {
+        summary
+    } else if let Some(user) = current_user {
+        format!(
+            "Kite Passport is already authenticated as `{}`.",
+            user.email
+        )
+    } else {
+        "Kite Passport sign-up has not finished yet.".to_string()
     };
     let mcp_line = if status.mcp_url_configured {
         format!(
@@ -768,13 +925,15 @@ async fn handle_kite_setup(
     });
     emit(KiteEvent::WaitingForMcpConfig);
     emit(KiteEvent::Token(format!(
-        "Kite setup\n{}\n\n{}\n\nKite Passport is invitation-only during testnet. Users still create their own Passport account, wallet, and agent in the Kite Portal.\n\nNext steps\n1. Open the Kite Portal: {}\n2. Complete the invite-only account flow and create your agent.\n3. Copy the MCP URL from the Portal.\n4. Paste it into Settings > Agent > Kite Passport and click Verify.\n\n{}\n\nReference MCP endpoint format shown by Kite docs\n{}",
+        "Kite setup\n{}\n\n{}\n\n{}\n\n{}\n\nNext steps\n1. Open the Kite Portal: {}\n2. Create your wallet and agent in the Portal.\n3. Copy the MCP URL from the Portal.\n4. Paste it into Settings > Agent > Kite Passport and click Verify.\n\n{}\n\nReference MCP endpoint format shown by Kite docs\n{}",
         cli_line,
         if installed_now {
             "Thikra installed Kite CLI with its own Windows fallback installer, so setup can continue even if Kite's hosted PowerShell bootstrap is broken."
         } else {
             "Kite CLI was already available, so setup can continue immediately."
         },
+        describe_kite_agent_passport_install(install_outcome.as_ref()),
+        signup_line,
         KITE_PORTAL_URL,
         mcp_line,
         KITE_TESTNET_MCP_URL
@@ -1842,6 +2001,7 @@ fn clear_kite_settings(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
         KiteAuthState::MissingMcpUrl.as_storage_str(),
     )?;
     crate::database::set_config(conn, KITE_LAST_PAYER_KEY, "")?;
+    crate::database::set_config(conn, KITE_PENDING_SIGNUP_ID_KEY, "")?;
     Ok(())
 }
 
@@ -1858,6 +2018,160 @@ fn store_string_setting(
 
 fn store_auth_state(db: &crate::history::Database, state: KiteAuthState) -> Result<(), KiteError> {
     store_string_setting(db, KITE_AUTH_STATE_KEY, state.as_storage_str())
+}
+
+fn load_optional_setting(conn: &rusqlite::Connection, key: &str) -> Option<String> {
+    crate::database::get_config(conn, key)
+        .ok()
+        .flatten()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn validate_signup_email(email: &str) -> Result<String, KiteError> {
+    let trimmed = email.trim();
+    if trimmed.is_empty() || !trimmed.contains('@') {
+        return Err(KiteError::BadInput(
+            "Provide a valid email with `/kite setup --email you@example.com` or save it in Settings > Agent > Kite Passport.".to_string(),
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn validate_signup_code(code: &str) -> Result<String, KiteError> {
+    let trimmed = code.trim();
+    let valid = trimmed.len() == 8 && trimmed.chars().all(|ch| ch.is_ascii_alphanumeric());
+    if !valid {
+        return Err(KiteError::BadInput(
+            "Kite sign-up codes are 8 alphanumeric characters. Retry with `/kite setup --code ABCD1234`.".to_string(),
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn format_kpass_error(action: &str, stdout: &str, stderr: &str) -> KiteError {
+    let parsed = serde_json::from_str::<KpassEnvelope>(stdout).ok();
+    let detail = parsed
+        .as_ref()
+        .and_then(|response| {
+            let error = response.error.trim();
+            let hint = response.hint.trim();
+            if !error.is_empty() && !hint.is_empty() {
+                Some(format!("{error} {hint}"))
+            } else if !error.is_empty() {
+                Some(error.to_string())
+            } else if !hint.is_empty() {
+                Some(hint.to_string())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| format_process_output(stdout.as_bytes(), stderr.as_bytes()));
+    KiteError::BadInput(format!("Kite {action} failed. {detail}"))
+}
+
+fn run_kpass_json_command(
+    cli_path: &Path,
+    args: &[&str],
+    envs: &[(&str, &str)],
+) -> Result<(String, String, Option<i32>), KiteError> {
+    let mut command = Command::new(cli_path);
+    command.args(args);
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    let output = command.output().map_err(|err| {
+        KiteError::CliInstallFailed(format!(
+            "Thikra could not run Kite CLI at `{}`. {}",
+            cli_path.display(),
+            err
+        ))
+    })?;
+    Ok((
+        String::from_utf8_lossy(&output.stdout).trim().to_string(),
+        String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        output.status.code(),
+    ))
+}
+
+fn load_current_kite_user(cli_path: &Path) -> Result<Option<KpassMeResponse>, KiteError> {
+    let (stdout, stderr, exit_code) =
+        run_kpass_json_command(cli_path, &["me", "--output", "json"], &[])?;
+    if exit_code == Some(0) {
+        return serde_json::from_str::<KpassMeResponse>(&stdout)
+            .map(Some)
+            .map_err(|err| {
+                KiteError::Unknown(format!("Kite returned unreadable account details. {err}"))
+            });
+    }
+    if exit_code == Some(3) {
+        return Ok(None);
+    }
+    Err(format_kpass_error("account check", &stdout, &stderr))
+}
+
+fn start_kite_signup(cli_path: &Path, email: &str) -> Result<KpassSignupInitResponse, KiteError> {
+    let (stdout, stderr, exit_code) = run_kpass_json_command(
+        cli_path,
+        &[
+            "signup",
+            "init",
+            "--email",
+            email,
+            "--client",
+            "agent",
+            "--output",
+            "json",
+            "--no-interactive",
+        ],
+        &[],
+    )?;
+    if exit_code == Some(0) {
+        return serde_json::from_str::<KpassSignupInitResponse>(&stdout).map_err(|err| {
+            KiteError::Unknown(format!("Kite returned unreadable sign-up details. {err}"))
+        });
+    }
+    Err(format_kpass_error("sign-up start", &stdout, &stderr))
+}
+
+fn complete_kite_signup(
+    cli_path: &Path,
+    signup_id: &str,
+    code: &str,
+) -> Result<KpassSignupExchangeResponse, KiteError> {
+    let (stdout, stderr, exit_code) = run_kpass_json_command(
+        cli_path,
+        &[
+            "signup",
+            "exchange",
+            "--signup-id",
+            signup_id,
+            "--output",
+            "json",
+        ],
+        &[("KPASS_SIGNUP_CODE", code)],
+    )?;
+    if exit_code == Some(0) {
+        return serde_json::from_str::<KpassSignupExchangeResponse>(&stdout).map_err(|err| {
+            KiteError::Unknown(format!(
+                "Kite returned unreadable sign-up completion details. {err}"
+            ))
+        });
+    }
+    Err(format_kpass_error("sign-up completion", &stdout, &stderr))
+}
+
+fn describe_signup_waiting_message(email: &str) -> String {
+    format!(
+        "Kite Passport sign-up is waiting on email verification.\n\nA verification link and 8-character sign-up code were sent to `{email}`.\n\nNext steps\n1. Open the verification email and click the link first.\n2. Find the 8-character code from the Kite sign-up email.\n3. Run `/kite setup --code ABCD1234` to finish creating the Passport account."
+    )
+}
+
+fn describe_signup_success(user: &KpassSignupExchangeResponse) -> String {
+    format!(
+        "Kite Passport account created and logged in.\n\nEmail: `{}`\nUser ID: `{}`\nSession: active",
+        user.email, user.user_id
+    )
 }
 
 fn load_setup_status(conn: &rusqlite::Connection, cli: Option<PathBuf>) -> KiteSetupStatus {
@@ -1884,6 +2198,8 @@ fn load_setup_status(conn: &rusqlite::Connection, cli: Option<PathBuf>) -> KiteS
         .ok()
         .flatten()
         .filter(|value| !value.trim().is_empty());
+    let signup_email = load_optional_setting(conn, KITE_SIGNUP_EMAIL_KEY);
+    let pending_signup_id = load_optional_setting(conn, KITE_PENDING_SIGNUP_ID_KEY);
     let masked_mcp_url = if raw_url.trim().is_empty() {
         None
     } else {
@@ -1898,6 +2214,8 @@ fn load_setup_status(conn: &rusqlite::Connection, cli: Option<PathBuf>) -> KiteS
         auth_state,
         connected,
         last_payer_addr,
+        signup_email,
+        pending_signup_id,
         invite_only: true,
         docs_url: KITE_DOCS_URL.to_string(),
         portal_url: KITE_PORTAL_URL.to_string(),
@@ -1919,9 +2237,9 @@ fn detect_kite_cli() -> Option<PathBuf> {
         .find(|candidate| candidate.exists())
 }
 
-fn install_kite_cli_inner() -> Result<PathBuf, KiteError> {
+fn install_kite_cli_inner() -> Result<KiteCliInstallOutcome, KiteError> {
     if let Some(path) = detect_kite_cli() {
-        return Ok(path);
+        return ensure_kite_agent_passport_bootstrap(&path);
     }
 
     #[cfg(target_os = "windows")]
@@ -1949,15 +2267,16 @@ fn install_kite_cli_inner() -> Result<PathBuf, KiteError> {
             )));
         }
 
-        detect_kite_cli().ok_or_else(|| {
+        let path = detect_kite_cli().ok_or_else(|| {
             KiteError::CliInstallFailed(
                 "The Kite installer completed, but `kpass` was still not found on this machine. Retry the install from Settings or follow Kite's official install docs.".to_string(),
             )
-        })
+        })?;
+        ensure_kite_agent_passport_bootstrap(&path)
     }
 }
 
-async fn install_kite_cli_inner_async() -> Result<PathBuf, KiteError> {
+async fn install_kite_cli_inner_async() -> Result<KiteCliInstallOutcome, KiteError> {
     run_blocking_kite_task("Kite CLI installation", install_kite_cli_inner).await
 }
 
@@ -1973,6 +2292,123 @@ where
     })?
 }
 
+#[cfg(target_os = "windows")]
+fn ensure_kite_bin_on_user_path(cli_path: &Path) -> Result<bool, KiteError> {
+    let Some(bin_dir) = cli_path.parent() else {
+        return Ok(false);
+    };
+    let output = Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "[Environment]::GetEnvironmentVariable('Path','User')",
+        ])
+        .output()
+        .map_err(|err| {
+            installer_stage_error(
+                "user PATH update",
+                format!("Could not read user PATH: {err}"),
+            )
+        })?;
+    if !output.status.success() {
+        return Err(installer_stage_error(
+            "user PATH update",
+            format!(
+                "PowerShell exited with code {:?} while reading the user PATH.",
+                output.status.code()
+            ),
+        ));
+    }
+
+    let current_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let bin_dir_str = bin_dir.display().to_string();
+    let Some(updated_path) = merge_windows_path(&current_path, &bin_dir_str) else {
+        return Ok(false);
+    };
+    let escaped = updated_path.replace('\'', "''");
+    let status = Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-Command",
+            &format!("[Environment]::SetEnvironmentVariable('Path', '{escaped}', 'User')"),
+        ])
+        .status()
+        .map_err(|err| {
+            installer_stage_error(
+                "user PATH update",
+                format!("Could not update user PATH: {err}"),
+            )
+        })?;
+    if !status.success() {
+        return Err(installer_stage_error(
+            "user PATH update",
+            format!(
+                "PowerShell exited with code {:?} while updating the user PATH.",
+                status.code()
+            ),
+        ));
+    }
+    Ok(true)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn ensure_kite_bin_on_user_path(_cli_path: &Path) -> Result<bool, KiteError> {
+    Ok(false)
+}
+
+#[cfg(target_os = "windows")]
+fn run_kpass_skills_setup(cli_path: &Path) -> Result<bool, KiteError> {
+    let output = Command::new(cli_path)
+        .args(["skills", "setup", "--global", "--no-interactive"])
+        .output()
+        .map_err(|err| {
+            installer_stage_error(
+                "Kite Agent Passport bootstrap",
+                format!("Could not launch `kpass skills setup`: {err}"),
+            )
+        })?;
+    if !output.status.success() {
+        return Err(installer_stage_error(
+            "Kite Agent Passport bootstrap",
+            format!(
+                "`kpass skills setup --global --no-interactive` exited with code {:?}.\n{}",
+                output.status.code(),
+                format_process_output(&output.stdout, &output.stderr)
+            ),
+        ));
+    }
+    Ok(true)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn run_kpass_skills_setup(_cli_path: &Path) -> Result<bool, KiteError> {
+    Ok(false)
+}
+
+fn merge_windows_path(current_path: &str, new_entry: &str) -> Option<String> {
+    let normalized_new = new_entry.trim().trim_end_matches(['\\', '/']);
+    if normalized_new.is_empty() {
+        return None;
+    }
+
+    let exists = current_path
+        .split(';')
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .map(|entry| entry.trim_end_matches(['\\', '/']))
+        .any(|entry| entry.eq_ignore_ascii_case(normalized_new));
+    if exists {
+        return None;
+    }
+
+    let trimmed_existing = current_path.trim().trim_end_matches(';');
+    if trimmed_existing.is_empty() {
+        Some(normalized_new.to_string())
+    } else {
+        Some(format!("{trimmed_existing};{normalized_new}"))
+    }
+}
+
 fn kite_cli_candidates() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     if let Some(home) = dirs::home_dir() {
@@ -1982,8 +2418,68 @@ fn kite_cli_candidates() -> Vec<PathBuf> {
     candidates
 }
 
+fn kite_codex_skill_marker_path() -> Option<PathBuf> {
+    dirs::home_dir().map(|home| {
+        home.join(".agents")
+            .join("skills")
+            .join("kite-passport")
+            .join("SKILL.md")
+    })
+}
+
+fn ensure_kite_agent_passport_bootstrap(
+    cli_path: &Path,
+) -> Result<KiteCliInstallOutcome, KiteError> {
+    let mut notes = Vec::new();
+    let path_updated = ensure_kite_bin_on_user_path(cli_path).unwrap_or_else(|err| {
+        notes.push(format!(
+            "Thikra could not add `~/.kpass/bin` to the user PATH automatically: {}",
+            err.message()
+        ));
+        false
+    });
+    let skills_bootstrapped = if kite_codex_skill_marker_path()
+        .is_some_and(|marker| marker.exists())
+    {
+        false
+    } else {
+        run_kpass_skills_setup(cli_path).unwrap_or_else(|err| {
+            notes.push(format!(
+                "Thikra installed `kpass`, but the post-install Kite Agent Passport skills bootstrap did not finish automatically: {}",
+                err.message()
+            ));
+            false
+        })
+    };
+
+    Ok(KiteCliInstallOutcome {
+        cli_path: cli_path.to_path_buf(),
+        path_updated,
+        skills_bootstrapped,
+        notes,
+    })
+}
+
+fn describe_kite_agent_passport_install(outcome: Option<&KiteCliInstallOutcome>) -> String {
+    let Some(outcome) = outcome else {
+        return "Kite Agent Passport skills were already present for this machine, so Thikra only needed to continue the MCP and portal setup flow.".to_string();
+    };
+
+    let mut lines = Vec::new();
+    if outcome.skills_bootstrapped {
+        lines.push("Thikra also bootstrapped the Kite Agent Passport skills globally, matching Kite's post-install setup flow.".to_string());
+    } else {
+        lines.push("Kite Agent Passport skills were already present, so Thikra skipped the extra bootstrap step.".to_string());
+    }
+    if outcome.path_updated {
+        lines.push("`~/.kpass/bin` was added to the user PATH for future shells.".to_string());
+    }
+    lines.extend(outcome.notes.iter().cloned());
+    lines.join("\n")
+}
+
 #[cfg(target_os = "windows")]
-fn install_kite_cli_windows(base_url: &str) -> Result<PathBuf, KiteError> {
+fn install_kite_cli_windows(base_url: &str) -> Result<KiteCliInstallOutcome, KiteError> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
@@ -2004,7 +2500,7 @@ fn install_kite_cli_windows_with_client(
     client: &reqwest::blocking::Client,
     base_url: &str,
     install_dir: &Path,
-) -> Result<PathBuf, KiteError> {
+) -> Result<KiteCliInstallOutcome, KiteError> {
     let bundle_version = resolve_kite_bundle_version(client, base_url)?;
     let manifest = fetch_kite_bundle_manifest(client, base_url, &bundle_version)?;
     let platform = "windows-amd64";
@@ -2019,7 +2515,7 @@ fn install_kite_cli_windows_with_client(
     fs::create_dir_all(&temp_dir)
         .map_err(|err| installer_stage_error("temp directory creation", err))?;
 
-    let install_result = (|| -> Result<PathBuf, KiteError> {
+    let install_result = (|| -> Result<KiteCliInstallOutcome, KiteError> {
         let cli_zip = temp_dir.join("cli.zip");
         download_to_path(
             client,
@@ -2117,7 +2613,7 @@ fn install_kite_cli_windows_with_client(
             ));
         }
 
-        Ok(kpass_destination)
+        ensure_kite_agent_passport_bootstrap(&kpass_destination)
     })();
 
     let _ = fs::remove_dir_all(&temp_dir);
@@ -2385,7 +2881,6 @@ fn kite_installer_command() -> (String, Vec<String>) {
     )
 }
 
-#[cfg(not(target_os = "windows"))]
 fn format_process_output(stdout: &[u8], stderr: &[u8]) -> String {
     let stderr_text = String::from_utf8_lossy(stderr).trim().to_string();
     let stdout_text = String::from_utf8_lossy(stdout).trim().to_string();
@@ -2441,6 +2936,8 @@ fn kite_help_text() -> String {
     [
         "Kite commands",
         "/kite setup",
+        "/kite setup --email you@example.com",
+        "/kite setup --code ABCD1234",
         "/kite connect",
         "/kite status",
         "/kite payer",
@@ -2448,7 +2945,7 @@ fn kite_help_text() -> String {
         "/kite call --url <https://...> [--method GET|POST] [--body <json>] [--merchant <name>]",
         "",
         "Mode 1 note",
-        "Users still create their Kite Passport account and agent in the Kite Portal, then paste the MCP URL into Settings > Agent > Kite Passport.",
+        "Thikra can install Kite Passport CLI and start account sign-up. Wallet and agent provisioning still happen in the Kite Portal before you paste the MCP URL into Settings > Agent > Kite Passport.",
     ]
     .join("\n")
 }
@@ -2479,7 +2976,10 @@ fn parse_kite_command(input: &str) -> Result<KiteCommand, KiteError> {
     let args = parse_flag_args(&filtered)?;
     match subcommand.as_str() {
         "help" => Ok(KiteCommand::Help),
-        "setup" => Ok(KiteCommand::Setup),
+        "setup" => Ok(KiteCommand::Setup {
+            email: args.optional("email"),
+            code: args.optional("code"),
+        }),
         "connect" => Ok(KiteCommand::Connect),
         "status" => Ok(KiteCommand::Status),
         "payer" => Ok(KiteCommand::Payer),
@@ -2745,7 +3245,24 @@ mod tests {
         assert_eq!(parse_kite_command("/kite help").unwrap(), KiteCommand::Help);
         assert_eq!(
             parse_kite_command("/kite setup").unwrap(),
-            KiteCommand::Setup
+            KiteCommand::Setup {
+                email: None,
+                code: None,
+            }
+        );
+        assert_eq!(
+            parse_kite_command("/kite setup --email and00sama@gmail.com").unwrap(),
+            KiteCommand::Setup {
+                email: Some("and00sama@gmail.com".to_string()),
+                code: None,
+            }
+        );
+        assert_eq!(
+            parse_kite_command("/kite setup --code A1B2C3D4").unwrap(),
+            KiteCommand::Setup {
+                email: None,
+                code: Some("A1B2C3D4".to_string()),
+            }
         );
     }
 
@@ -2813,6 +3330,8 @@ mod tests {
         let status = load_setup_status(&conn, None);
         assert!(!status.cli_installed);
         assert!(!status.mcp_url_configured);
+        assert_eq!(status.signup_email, None);
+        assert_eq!(status.pending_signup_id, None);
         assert_eq!(status.auth_state, KiteAuthState::CliMissing);
     }
 
@@ -2829,6 +3348,9 @@ mod tests {
             .unwrap();
             crate::database::set_config(&conn, KITE_AUTH_STATE_KEY, "ready").unwrap();
             crate::database::set_config(&conn, KITE_LAST_PAYER_KEY, "0x123").unwrap();
+            crate::database::set_config(&conn, KITE_SIGNUP_EMAIL_KEY, "and00sama@gmail.com")
+                .unwrap();
+            crate::database::set_config(&conn, KITE_PENDING_SIGNUP_ID_KEY, "signup_123").unwrap();
         }
         let conn = db.0.lock().unwrap();
         let status = load_setup_status(
@@ -2839,6 +3361,19 @@ mod tests {
         assert!(status.mcp_url_configured);
         assert!(status.connected);
         assert_eq!(status.last_payer_addr.as_deref(), Some("0x123"));
+        assert_eq!(status.signup_email.as_deref(), Some("and00sama@gmail.com"));
+        assert_eq!(status.pending_signup_id.as_deref(), Some("signup_123"));
+    }
+
+    #[test]
+    fn signup_validation_helpers_reject_bad_inputs() {
+        assert!(validate_signup_email("not-an-email").is_err());
+        assert!(validate_signup_code("short").is_err());
+        assert_eq!(
+            validate_signup_email("  and00sama@gmail.com ").unwrap(),
+            "and00sama@gmail.com"
+        );
+        assert_eq!(validate_signup_code("A1B2C3D4").unwrap(), "A1B2C3D4");
     }
 
     #[test]
@@ -2961,7 +3496,7 @@ mod tests {
         let installed =
             install_kite_cli_windows_with_client(&client, &server.url(), &install_dir).unwrap();
 
-        assert!(installed.exists());
+        assert!(installed.cli_path.exists());
         assert!(install_dir.join("bin").join("kpass.exe").exists());
         assert!(install_dir.join("bin").join("ksearch.exe").exists());
         assert!(install_dir
@@ -3455,6 +3990,22 @@ mod tests {
             resolve_kite_agent_launch_model(Some(&provider_config), &active_model).unwrap_err();
 
         assert!(matches!(error, KiteError::BadInput(_)));
+    }
+
+    #[test]
+    fn merge_windows_path_appends_missing_entry_once() {
+        let merged =
+            merge_windows_path(r"C:\Windows\System32;C:\Tools", r"C:\Users\IAM\.kpass\bin")
+                .unwrap();
+
+        assert_eq!(
+            merged,
+            r"C:\Windows\System32;C:\Tools;C:\Users\IAM\.kpass\bin"
+        );
+        assert_eq!(
+            merge_windows_path(&merged, r"C:\Users\IAM\.kpass\bin"),
+            None
+        );
     }
 
     #[tokio::test]

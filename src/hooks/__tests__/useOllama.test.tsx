@@ -1044,5 +1044,71 @@ describe('useOllama', () => {
       );
       expect(assistantMsg?.content).toContain('Kite advisory fallback guidance');
     });
+
+    it('replaces Kite progress placeholders inline as setup advances', async () => {
+      const { result } = renderHook(() => useOllama());
+
+      await act(async () => {
+        await result.current.askKite('/kite setup');
+      });
+
+      const channel = getChannel();
+      act(() => {
+        channel!.simulateMessage({ type: 'checking_cli' });
+      });
+      let assistantMsg = result.current.messages.find(
+        (message) => message.role === 'assistant',
+      );
+      expect(assistantMsg?.content).toContain('Checking Kite CLI');
+
+      act(() => {
+        channel!.simulateMessage({ type: 'installing_cli' });
+      });
+      assistantMsg = result.current.messages.find(
+        (message) => message.role === 'assistant',
+      );
+      expect(assistantMsg?.content).toContain('Installing Kite CLI');
+
+      act(() => {
+        channel!.simulateMessage({
+          type: 'token',
+          data: 'Kite setup final guidance',
+        });
+        channel!.simulateMessage({ type: 'done' });
+      });
+      assistantMsg = result.current.messages.find(
+        (message) => message.role === 'assistant',
+      );
+      expect(assistantMsg?.content).toBe('Kite setup final guidance');
+    });
+
+    it('does not duplicate advisory fallback guidance when a matching token arrives', async () => {
+      const { result } = renderHook(() => useOllama());
+
+      await act(async () => {
+        await result.current.askKite('/kite setup');
+      });
+
+      const channel = getChannel();
+      act(() => {
+        channel!.simulateMessage({
+          type: 'advisory_fallback',
+          data: {
+            reason: 'Cloud provider unavailable',
+            guidance: 'Kite guided help once',
+          },
+        });
+        channel!.simulateMessage({
+          type: 'token',
+          data: 'Kite guided help once',
+        });
+        channel!.simulateMessage({ type: 'done' });
+      });
+
+      const assistantMsg = result.current.messages.find(
+        (message) => message.role === 'assistant',
+      );
+      expect(assistantMsg?.content).toBe('Kite guided help once');
+    });
   });
 });

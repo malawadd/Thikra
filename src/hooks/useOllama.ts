@@ -54,6 +54,7 @@ export type StreamChunk =
 export type KiteEvent =
   | { type: 'checking_cli' }
   | { type: 'installing_cli' }
+  | { type: 'installing_agent_passport' }
   | { type: 'opening_portal'; data: { target: string } }
   | { type: 'waiting_for_mcp_config' }
   | { type: 'verifying_connection' }
@@ -84,6 +85,7 @@ type BasicKiteProgressEvent = Extract<
   KiteEvent,
   | { type: 'checking_cli' }
   | { type: 'installing_cli' }
+  | { type: 'installing_agent_passport' }
   | { type: 'opening_portal'; data: { target: string } }
   | { type: 'waiting_for_mcp_config' }
   | { type: 'verifying_connection' }
@@ -98,6 +100,8 @@ function describeKiteEvent(event: BasicKiteProgressEvent): string {
       return 'Checking Kite CLI…';
     case 'installing_cli':
       return 'Installing Kite CLI…';
+    case 'installing_agent_passport':
+      return 'Finishing Kite Agent Passport setup…';
     case 'opening_portal':
       return `Opening Kite ${event.data.target}…`;
     case 'waiting_for_mcp_config':
@@ -125,6 +129,7 @@ function describeExtendedKiteEvent(
   if (
     event.type === 'checking_cli' ||
     event.type === 'installing_cli' ||
+    event.type === 'installing_agent_passport' ||
     event.type === 'opening_portal' ||
     event.type === 'waiting_for_mcp_config' ||
     event.type === 'verifying_connection' ||
@@ -523,6 +528,7 @@ export function useOllama(
       const channel = new Channel<KiteEvent>();
       let currentContent = '';
       let finished = false;
+      let contentMode: 'empty' | 'progress' | 'final' = 'empty';
 
       const updateAssistant = (patch: Partial<Message>) => {
         setMessages((prev) =>
@@ -532,20 +538,31 @@ export function useOllama(
         );
       };
 
+      const replaceAssistantContent = (
+        content: string,
+        mode: 'progress' | 'final',
+      ) => {
+        currentContent = content;
+        contentMode = mode;
+        updateAssistant({ content });
+      };
+
       channel.onmessage = (event) => {
         switch (event.type) {
           case 'token':
-            currentContent += event.data;
-            updateAssistant({ content: currentContent });
+            if (contentMode !== 'final') {
+              replaceAssistantContent(event.data, 'final');
+            } else if (event.data !== currentContent) {
+              currentContent += event.data;
+              updateAssistant({ content: currentContent });
+            }
             break;
           case 'advisory_fallback':
-            currentContent = event.data.guidance;
-            updateAssistant({ content: currentContent });
+            replaceAssistantContent(event.data.guidance, 'final');
             break;
           case 'awaiting_sensitive_value':
-            if (!currentContent) {
-              currentContent = event.data.instructions;
-              updateAssistant({ content: currentContent });
+            if (contentMode !== 'final') {
+              replaceAssistantContent(event.data.instructions, 'final');
             }
             break;
           case 'awaiting_payment_confirmation': {
@@ -554,11 +571,13 @@ export function useOllama(
               ? 'confirm_kite_payment_action'
               : 'reject_kite_payment_action';
             void invoke(command, { actionId: event.data.action_id });
-            if (!currentContent) {
-              currentContent = approved
-                ? 'Payment confirmation sent. Resuming Kite flow...'
-                : 'Payment was cancelled before Kite signed anything.';
-              updateAssistant({ content: currentContent });
+            if (contentMode !== 'final') {
+              replaceAssistantContent(
+                approved
+                  ? 'Payment confirmation sent. Resuming Kite flow...'
+                  : 'Payment was cancelled before Kite signed anything.',
+                'final',
+              );
             }
             break;
           }
@@ -573,12 +592,16 @@ export function useOllama(
             break;
           case 'error':
             finished = true;
-            updateAssistant({ content: event.data, errorKind: 'Other' });
+            replaceAssistantContent(event.data, 'final');
+            updateAssistant({ errorKind: 'Other' });
             setIsGenerating(false);
             break;
           default:
-            if (!currentContent) {
-              updateAssistant({ content: describeExtendedKiteEvent(event) });
+            if (contentMode !== 'final') {
+              replaceAssistantContent(
+                describeExtendedKiteEvent(event),
+                'progress',
+              );
             }
             break;
         }
