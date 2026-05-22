@@ -244,7 +244,7 @@ export function useOllama(
         } else if (chunk.type === 'Done') {
           setIsGenerating(false);
           // Show a desktop toast when the user has switched away from the app.
-          void notifyIfUnfocused('windowsMate - Thuki', 'Response ready');
+          void notifyIfUnfocused('Thikra', 'Response ready');
           // Notify the caller that a complete turn has finished so it can
           // persist both messages to SQLite if the conversation is saved.
           onTurnComplete?.(userMsg, {
@@ -584,7 +584,7 @@ export function useOllama(
           case 'done':
             finished = true;
             setIsGenerating(false);
-            void notifyIfUnfocused('windowsMate - Thuki', 'Kite response ready');
+            void notifyIfUnfocused('Thikra', 'Kite response ready');
             onTurnComplete?.(userMsg, {
               ...assistantMsg,
               content: currentContent,

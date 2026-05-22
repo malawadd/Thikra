@@ -66,11 +66,11 @@ export function MinibarView({ status, onClick }: MinibarViewProps) {
       onPointerDown={handlePointerDown}
       style={{ backdropFilter: 'blur(12px)', background: 'rgba(32,32,32,0.35)' }}
       className="relative w-12 h-12 rounded-full cursor-pointer select-none flex items-center justify-center"
-      title="windowsMate - Thuki — click to restore, drag to move"
+      title="Thikra — click to restore, drag to move"
     >
       <img
         src="thuki-logo.png"
-        alt="windowsMate - Thuki"
+        alt="Thikra"
         className="w-7 h-7 rounded-full pointer-events-none"
         draggable={false}
       />

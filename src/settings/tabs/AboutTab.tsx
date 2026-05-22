@@ -23,7 +23,7 @@ interface AboutTabProps {
 export function AboutTab({ onSaved, onReload }: AboutTabProps) {
   const sha = import.meta.env.VITE_GIT_COMMIT_SHA?.slice(0, 7);
   const APP_VERSION = sha ? `${pkg.version}+nightly.${sha}` : pkg.version;
-  const releaseUrl = `https://github.com/ayzekhdawy/windowsMate - Thuki/releases/tag/v${pkg.version}`;
+  const releaseUrl = `https://github.com/malawadd/Thikra/releases/tag/v${pkg.version}`;
   const [confirmResetAll, setConfirmResetAll] = useState(false);
 
   return (
@@ -31,11 +31,11 @@ export function AboutTab({ onSaved, onReload }: AboutTabProps) {
       <div className={styles.aboutHero}>
         <img
           src={thukiLogo}
-          alt="windowsMate - Thuki"
+          alt="Thikra"
           className={styles.aboutHeroLogo}
           draggable={false}
         />
-        <div className={styles.aboutHeroTitle}>windowsMate - Thuki</div>
+        <div className={styles.aboutHeroTitle}>Thikra</div>
         <button
           type="button"
           className={styles.aboutHeroVersion}
@@ -45,7 +45,7 @@ export function AboutTab({ onSaved, onReload }: AboutTabProps) {
           v{APP_VERSION}
         </button>
         <div className={styles.aboutHeroTagline}>
-          A floating, local-first AI secretary for Windows.
+          A floating, local-first AI copilot for Windows.
           <br />
           <span className={styles.aboutHeroMantra}>
             No cloud. No clutter. Just answers.
@@ -55,10 +55,10 @@ export function AboutTab({ onSaved, onReload }: AboutTabProps) {
           <button
             type="button"
             className={styles.iconLinkBtn}
-            aria-label="View windowsMate - Thuki on GitHub"
+            aria-label="View Thikra on GitHub"
             onClick={() =>
               void invoke('open_url', {
-                url: 'https://github.com/ayzekhdawy/windowsMate - Thuki',
+                url: 'https://github.com/malawadd/Thikra',
               })
             }
           >
@@ -70,7 +70,7 @@ export function AboutTab({ onSaved, onReload }: AboutTabProps) {
             aria-label="Open an issue or share feedback on GitHub"
             onClick={() =>
               void invoke('open_url', {
-                url: 'https://github.com/ayzekhdawy/windowsMate - Thuki/issues',
+                url: 'https://github.com/malawadd/Thikra/issues',
               })
             }
           >
@@ -86,7 +86,7 @@ export function AboutTab({ onSaved, onReload }: AboutTabProps) {
             className={`${styles.button} ${styles.buttonGhost}`}
             onClick={() => void invoke('reveal_config_in_explorer')}
           >
-            Reveal windowsMate - Thuki app data
+            Reveal Thikra app data
           </button>
           <button
             type="button"

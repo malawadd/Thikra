@@ -1194,7 +1194,7 @@ describe('AboutTab', () => {
 
   it('renders the centered hero with title, version, and tagline', async () => {
     await renderAbout();
-    expect(screen.getByText('windowsMate - Thuki')).toBeInTheDocument();
+    expect(screen.getByText('Thikra')).toBeInTheDocument();
     expect(screen.getByText(/A floating, local-first AI/)).toBeInTheDocument();
     expect(
       screen.getByText(/No cloud\. No clutter\. Just answers\./),
@@ -1229,7 +1229,7 @@ describe('AboutTab', () => {
       screen.getByRole('button', { name: /release notes on GitHub/ }),
     );
     expect(invokeMock).toHaveBeenCalledWith('open_url', {
-      url: 'https://github.com/ayzekhdawy/windowsMate-Thuki/releases/tag/nightly',
+      url: expect.stringContaining('https://github.com/malawadd/Thikra/releases/tag/v'),
     });
     vi.unstubAllEnvs();
   });
@@ -1237,10 +1237,10 @@ describe('AboutTab', () => {
   it('GitHub icon button opens the repo', async () => {
     await renderAbout();
     fireEvent.click(
-      screen.getByRole('button', { name: 'View windowsMate - Thuki on GitHub' }),
+      screen.getByRole('button', { name: 'View Thikra on GitHub' }),
     );
     expect(invokeMock).toHaveBeenCalledWith('open_url', {
-      url: 'https://github.com/ayzekhdawy/windowsMate-Thuki',
+      url: 'https://github.com/malawadd/Thikra',
     });
   });
 
@@ -1258,15 +1258,15 @@ describe('AboutTab', () => {
     await renderAbout();
     fireEvent.click(screen.getByRole('button', { name: /Open an issue/ }));
     expect(invokeMock).toHaveBeenCalledWith('open_url', {
-      url: 'https://github.com/ayzekhdawy/windowsMate-Thuki/issues',
+      url: 'https://github.com/malawadd/Thikra/issues',
     });
   });
 
-  it('Reveal Mate app data invokes reveal_config_in_finder', async () => {
+  it('Reveal Thikra app data invokes reveal_config_in_finder', async () => {
     await renderAbout();
-    await waitFor(() => screen.getByText(/Reveal Mate app data/));
+    await waitFor(() => screen.getByText(/Reveal Thikra app data/));
     fireEvent.click(
-      screen.getByRole('button', { name: /Reveal Mate app data/ }),
+      screen.getByRole('button', { name: /Reveal Thikra app data/ }),
     );
     expect(invokeMock).toHaveBeenCalledWith('reveal_config_in_finder');
   });

@@ -161,7 +161,7 @@ export function ModelCheckStep() {
   const titleSub = isProbing
     ? 'Checking your local Ollama setup…'
     : ollamaConnected
-      ? "Almost there. Let's pick a brain for Thuki."
+      ? "Almost there. Let's pick a brain for Thikra."
       : 'Runs Ollama locally. Your chats stay on this machine.';
 
   return (
@@ -212,7 +212,7 @@ export function ModelCheckStep() {
             src={thukiLogo}
             width={40}
             height={40}
-            alt="Thuki"
+            alt="Thikra"
             style={{
               objectFit: 'contain',
               pointerEvents: 'none',

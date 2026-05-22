@@ -42,7 +42,7 @@ describe('OnboardingView', () => {
     render(<PermissionsStep />);
     await act(async () => {});
 
-    expect(screen.getByText("Let's get Mate set up")).toBeInTheDocument();
+    expect(screen.getByText("Let's get Thikra set up")).toBeInTheDocument();
   });
 
   it('skips to step 2 when accessibility is already granted on mount', async () => {

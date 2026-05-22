@@ -43,7 +43,7 @@ export function IntroStep({ onComplete }: Props) {
           src={thukiLogo}
           width={44}
           height={44}
-          alt="Thuki"
+          alt="Thikra"
           style={{
             objectFit: 'contain',
             display: 'block',

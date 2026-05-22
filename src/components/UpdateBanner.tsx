@@ -20,7 +20,7 @@ export function UpdateBanner({
       <div className={styles.updateBannerBody}>
         <div
           className={styles.updateBannerTitle}
-        >{`Mate ${version} is ready`}</div>
+        >{`Thikra ${version} is ready`}</div>
         <div className={styles.updateBannerMeta}>
           {notesUrl ? (
             <button

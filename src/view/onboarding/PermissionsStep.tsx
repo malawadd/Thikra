@@ -360,7 +360,7 @@ export function PermissionsStep() {
             src={thukiLogo}
             width={64}
             height={64}
-            alt="Mate"
+            alt="Thikra"
             style={{
               objectFit: 'contain',
               pointerEvents: 'none',
@@ -382,7 +382,7 @@ export function PermissionsStep() {
             margin: '0 0 20px',
           }}
         >
-          {"Let's get Mate set up"}
+          {"Let's get Thikra set up"}
         </h1>
 
         {/* Steps */}
@@ -425,7 +425,7 @@ export function PermissionsStep() {
                 Accessibility
               </div>
               <div style={{ fontSize: 12, color: '#6b6660', lineHeight: 1.5 }}>
-                Lets Mate respond to activator key (<KeyChip label="⌃" />
+                Lets Thikra respond to activator key (<KeyChip label="⌃" />
                 <KeyChip label="⌃" />)
               </div>
             </div>
@@ -512,9 +512,9 @@ export function PermissionsStep() {
               <>
                 <CTAButton
                   onClick={handleQuitAndRelaunch}
-                  aria-label="Quit and Reopen Mate"
+                  aria-label="Quit and Reopen Thikra"
                 >
-                  Quit & Reopen Mate
+                  Quit & Reopen Thikra
                 </CTAButton>
                 <p
                   style={{
